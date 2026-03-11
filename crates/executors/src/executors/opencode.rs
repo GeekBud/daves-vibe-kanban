@@ -76,10 +76,11 @@ struct OpencodeServer {
 
 impl Drop for OpencodeServer {
     fn drop(&mut self) {
-        // kill the process properly using the kill helper as the native kill_on_drop doesn't work reliably causing orphaned processes and memory leaks
+        // kill the process properly using the native kill as kill_process_group would send SIGINT to the entire process group including the parent process
         if let Some(mut child) = self.child.take() {
             tokio::spawn(async move {
-                let _ = workspace_utils::process::kill_process_group(&mut child).await;
+                let _ = child.kill().await;
+                let _ = child.wait().await;
             });
         }
     }
