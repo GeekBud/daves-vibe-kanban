@@ -28,11 +28,110 @@ use crate::{
     executors::{ExecutorError, ExecutorExitResult, SpawnedChild, acp::AcpEvent},
 };
 
+/// Complete ACP initialization handshake with Kimi (or other agents that require string protocolVersion).
+/// This is needed because the agent-client-protocol crate sends protocolVersion as integer (1),
+/// but Kimi expects string format ("1.0").
+async fn complete_kimi_handshake<
+    R: tokio::io::AsyncRead + Unpin,
+    W: tokio::io::AsyncWrite + Unpin,
+>(
+    stdout: &mut R,
+    stdin: &mut W,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use tokio::io::AsyncReadExt;
+
+    // Send initialize request with string protocolVersion
+    let init_request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "1.0",
+            "clientCapabilities": {},
+            "clientInfo": {
+                "name": "Vibe Kanban",
+                "version": "0.1.28"
+            }
+        }
+    });
+    let init_json = init_request.to_string() + "\n";
+    tracing::debug!("Sending Kimi initialize request: {}", init_json.trim());
+    stdin.write_all(init_json.as_bytes()).await?;
+    stdin.flush().await?;
+
+    // Read response
+    let mut buf = vec![0u8; 4096];
+    let mut response_lines = Vec::new();
+    let timeout = tokio::time::Duration::from_secs(10);
+
+    let read_response = async {
+        loop {
+            let n = stdout.read(&mut buf).await?;
+            if n == 0 {
+                return Err::<String, std::io::Error>(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "EOF while reading init response",
+                ));
+            }
+            response_lines.extend_from_slice(&buf[..n]);
+            // Check if we have a complete JSON object
+            let response_str = String::from_utf8_lossy(&response_lines);
+            if let Some(line) = response_str.lines().next() {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                    if json.get("id").is_some()
+                        && (json.get("result").is_some() || json.get("error").is_some())
+                    {
+                        tracing::debug!("Received Kimi initialize response: {}", line);
+                        return Ok(line.to_string());
+                    }
+                }
+            }
+        }
+    };
+
+    match tokio::time::timeout(timeout, read_response).await {
+        Ok(Ok(response)) => {
+            // Check if response contains error
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
+                if json.get("error").is_some() {
+                    tracing::warn!("Kimi initialize returned error: {}", response);
+                } else {
+                    tracing::debug!("Kimi initialize succeeded");
+                }
+            }
+        }
+        Ok(Err(e)) => return Err(e.into()),
+        Err(_) => {
+            tracing::warn!("Timeout waiting for Kimi initialize response");
+            return Err("Initialize timeout".into());
+        }
+    }
+
+    // Send initialized notification (no response expected)
+    let initialized_notification = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "initialized",
+        "params": {}
+    });
+    let notif_json = initialized_notification.to_string() + "\n";
+    tracing::debug!(
+        "Sending Kimi initialized notification: {}",
+        notif_json.trim()
+    );
+    stdin.write_all(notif_json.as_bytes()).await?;
+    stdin.flush().await?;
+
+    Ok(())
+}
+
 /// Reusable harness for ACP-based conns (Gemini, Qwen, etc.)
 pub struct AcpAgentHarness {
     session_namespace: String,
     model: Option<String>,
     mode: Option<String>,
+    /// Whether to use string format for protocolVersion in initialize request.
+    /// Some agents (like Kimi) expect "1.0" string instead of integer 1.
+    use_string_protocol_version: bool,
 }
 
 impl Default for AcpAgentHarness {
@@ -49,6 +148,7 @@ impl AcpAgentHarness {
             session_namespace: "gemini_sessions".to_string(),
             model: None,
             mode: None,
+            use_string_protocol_version: false,
         }
     }
 
@@ -58,6 +158,17 @@ impl AcpAgentHarness {
             session_namespace: namespace.into(),
             model: None,
             mode: None,
+            use_string_protocol_version: false,
+        }
+    }
+
+    /// Create a harness for agents that require string format protocolVersion (e.g. Kimi)
+    pub fn with_string_protocol_version(namespace: impl Into<String>) -> Self {
+        Self {
+            session_namespace: namespace.into(),
+            model: None,
+            mode: None,
+            use_string_protocol_version: true,
         }
     }
 
@@ -68,6 +179,12 @@ impl AcpAgentHarness {
 
     pub fn with_mode(mut self, mode: impl Into<String>) -> Self {
         self.mode = Some(mode.into());
+        self
+    }
+
+    /// Enable string format for protocolVersion (for Kimi compatibility)
+    pub fn with_string_protocol_version_flag(mut self) -> Self {
+        self.use_string_protocol_version = true;
         self
     }
 
@@ -122,6 +239,7 @@ impl AcpAgentHarness {
             self.mode.clone(),
             approvals,
             cancel.clone(),
+            self.use_string_protocol_version,
         )
         .await?;
 
@@ -175,6 +293,7 @@ impl AcpAgentHarness {
             self.mode.clone(),
             approvals,
             cancel.clone(),
+            self.use_string_protocol_version,
         )
         .await?;
 
@@ -197,6 +316,7 @@ impl AcpAgentHarness {
         mode: Option<String>,
         approvals: Option<std::sync::Arc<dyn ExecutorApprovalService>>,
         cancel: CancellationToken,
+        use_string_protocol_version: bool,
     ) -> Result<(), ExecutorError> {
         // Take child's stdio for ACP wiring
         let orig_stdout = child.inner().stdout.take().ok_or_else(|| {
@@ -226,6 +346,26 @@ impl AcpAgentHarness {
                 let _ = w.write_all(&data).await;
             }
         });
+
+        // For agents requiring string protocolVersion (e.g., Kimi), complete handshake first
+        let (orig_stdout, orig_stdin) = if use_string_protocol_version {
+            // Complete the initialization handshake directly with the child process
+            // before setting up the ACP connection
+            let mut stdout = orig_stdout;
+            let mut stdin = orig_stdin;
+            match complete_kimi_handshake(&mut stdout, &mut stdin).await {
+                Ok(()) => {
+                    tracing::debug!("Kimi ACP handshake completed successfully");
+                }
+                Err(e) => {
+                    tracing::warn!("Kimi ACP handshake failed: {}", e);
+                    // Continue anyway, let the standard flow handle errors
+                }
+            }
+            (stdout, stdin)
+        } else {
+            (orig_stdout, orig_stdin)
+        };
 
         // ACP client STDIO
         let (mut to_acp_writer, acp_incoming_reader) = tokio::io::duplex(64 * 1024);
@@ -331,9 +471,18 @@ impl AcpAgentHarness {
                         });
 
                         // Initialize
-                        let _ = conn
-                            .initialize(proto::InitializeRequest::new(proto::ProtocolVersion::V1))
-                            .await;
+                        let init_result = if use_string_protocol_version {
+                            // For Kimi and similar agents: we already sent a custom initialization
+                            // request with string protocolVersion before creating the connection.
+                            // Skip the standard library initialization to avoid duplicate requests.
+                            tracing::debug!("Skipping standard ACP initialization for string protocolVersion agent");
+                            Ok(proto::InitializeResponse::new(proto::ProtocolVersion::V1))
+                        } else {
+                            conn.initialize(proto::InitializeRequest::new(proto::ProtocolVersion::V1)).await
+                        };
+                        if let Err(ref e) = init_result {
+                            tracing::warn!("ACP initialization failed: {:?}", e);
+                        }
 
                         // Handle session creation/forking
                         let (acp_session_id, display_session_id, prompt_to_send) =

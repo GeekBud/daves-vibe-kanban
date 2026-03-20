@@ -49,30 +49,42 @@ pub struct KimiCode {
 impl KimiCode {
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
         // kimi is installed locally, not via npx
-        let mut builder = CommandBuilder::new("kimi");
+        // Note: ACP mode is now a subcommand 'kimi acp' instead of flag '--acp'
+        // Parameters must be placed before 'acp': kimi [options] acp
+        let mut base_cmd = "kimi".to_string();
 
         // Add model if specified
         if let Some(model) = &self.model {
-            builder = builder.extend_params(["--model", model.as_str()]);
+            base_cmd.push_str(&format!(" --model {}", shell_escape(model)));
         }
 
         // YOLO mode - auto approve all actions
         if self.yolo.unwrap_or(false) {
-            builder = builder.extend_params(["--yolo"]);
+            base_cmd.push_str(" --yolo");
         }
 
         // Thinking mode (default to true for better code quality)
         let thinking = self.thinking.unwrap_or(true);
         if thinking {
-            builder = builder.extend_params(["--thinking"]);
+            base_cmd.push_str(" --thinking");
         } else {
-            builder = builder.extend_params(["--no-thinking"]);
+            base_cmd.push_str(" --no-thinking");
         }
 
-        // Enable ACP (Agent Communication Protocol) for integration
-        builder = builder.extend_params(["--acp"]);
+        // Add acp subcommand at the end
+        base_cmd.push_str(" acp");
 
+        let builder = CommandBuilder::new(base_cmd);
         apply_overrides(builder, &self.cmd)
+    }
+}
+
+// Helper function to escape shell arguments
+fn shell_escape(s: &str) -> String {
+    if s.contains(' ') || s.contains('"') || s.contains('\'') {
+        format!("'{}'", s.replace('\'', "'\"'\"'"))
+    } else {
+        s.to_string()
     }
 }
 
@@ -100,7 +112,8 @@ impl StandardCodingAgentExecutor for KimiCode {
         prompt: &str,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let harness = AcpAgentHarness::with_session_namespace("kimi_sessions");
+        // Kimi expects string format protocolVersion ("1.0"), not integer
+        let harness = AcpAgentHarness::with_string_protocol_version("kimi_sessions");
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
         let kimi_command = self.build_command_builder()?.build_initial()?;
         let approvals = if self.yolo.unwrap_or(false) {
@@ -128,7 +141,8 @@ impl StandardCodingAgentExecutor for KimiCode {
         _reset_to_message_id: Option<&str>,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let harness = AcpAgentHarness::with_session_namespace("kimi_sessions");
+        // Kimi expects string format protocolVersion ("1.0"), not integer
+        let harness = AcpAgentHarness::with_string_protocol_version("kimi_sessions");
         let combined_prompt = self.append_prompt.combine_prompt(prompt);
         let kimi_command = self.build_command_builder()?.build_follow_up(&[])?;
         let approvals = if self.yolo.unwrap_or(false) {
@@ -250,10 +264,11 @@ mod tests {
         // Check that the command contains expected arguments
         let cmd_str = format!("{:?}", cmd);
         assert!(cmd_str.contains("kimi"));
+        assert!(cmd_str.contains("acp"));
         assert!(cmd_str.contains("--model"));
         assert!(cmd_str.contains("kimi-for-coding"));
         assert!(cmd_str.contains("--yolo"));
         assert!(cmd_str.contains("--no-thinking"));
-        assert!(cmd_str.contains("--acp"));
+        // Note: parameters are placed before 'acp': kimi [options] acp
     }
 }
