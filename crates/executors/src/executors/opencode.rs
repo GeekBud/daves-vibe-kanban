@@ -35,8 +35,8 @@ pub(crate) mod types;
 
 use sdk::{
     AgentInfo as SDKAgentInfo, LogWriter, RunConfig, build_authenticated_client,
-    generate_server_password, list_agents, list_commands, list_providers, run_session,
-    run_slash_command,
+    generate_server_password, list_agents, list_commands, list_config_providers, list_providers,
+    run_session, run_slash_command,
 };
 use slash_commands::{OpencodeSlashCommand, hardcoded_slash_commands};
 use types::{Config, ProviderModelInfo};
@@ -357,7 +357,12 @@ async fn wait_for_server_url(
             captured.push(line.clone());
         }
 
-        if let Some(url) = line.trim().strip_prefix("opencode server listening on ") {
+        // OpenCode and CodeMaker (OpenCode-compatible) both output "xxx server listening on <url>"
+        let url = line
+            .trim()
+            .strip_prefix("opencode server listening on ")
+            .or_else(|| line.trim().strip_prefix("codemaker server listening on "));
+        if let Some(url) = url {
             // Keep draining stdout to avoid backpressure on the server, but don't block startup.
             tokio::spawn(async move {
                 let mut lines = tokio::io::BufReader::new(lines.into_inner()).lines();
@@ -627,6 +632,7 @@ impl StandardCodingAgentExecutor for Opencode {
             let directory_str = directory.to_string();
 
             let providers_future = list_providers(&client, &base_url, &directory_str);
+            let config_providers_future = list_config_providers(&client, &base_url, &directory_str);
             let agents_future = list_agents(&client, &base_url, &directory_str);
             let commands_future = list_commands(&client, &base_url, &directory_str);
 
@@ -649,41 +655,74 @@ impl StandardCodingAgentExecutor for Opencode {
                 }
             };
 
-            let (providers_result, agents_result, commands_result, config_result) =
-                tokio::join!(providers_future, agents_future, commands_future, config_future);
+            let (providers_result, config_providers_result, agents_result, commands_result, config_result) =
+                tokio::join!(
+                    providers_future,
+                    config_providers_future,
+                    agents_future,
+                    commands_future,
+                    config_future
+                );
 
-            match providers_result {
-                Ok(data) => {
-                    models::seed_context_windows_cache(
-                        &cmd_key_for_discovery,
-                        models::extract_context_windows(&data),
-                    );
+            // Seed context windows from /provider (has limit.context per model)
+            if let Ok(data) = &providers_result {
+                models::seed_context_windows_cache(
+                    &cmd_key_for_discovery,
+                    models::extract_context_windows(data),
+                );
+            }
 
-                    final_options.model_selector.providers = data
-                        .all
+            // Prefer config/providers for model list: returns directory-configured providers
+            // (e.g. CodeMaker's opencode + netease-codemaker). Fall back to /provider when
+            // config/providers fails or is empty.
+            let providers_models_ok = match config_providers_result {
+                Ok(cfg) if !cfg.providers.is_empty() => {
+                    final_options.model_selector.providers = cfg
+                        .providers
                         .iter()
-                        .filter(|p| data.connected.contains(&p.id))
                         .map(|p| ModelProvider {
                             id: p.id.clone(),
                             name: p.name.clone(),
                         })
                         .collect();
+                    final_options.model_selector.models = cfg
+                        .providers
+                        .iter()
+                        .flat_map(|p| this.transform_models(&p.models, &p.id))
+                        .collect();
+                    true
+                }
+                _ => false,
+            };
 
+            if !providers_models_ok {
+                if let Ok(data) = providers_result {
+                    let provider_filter = |p: &&types::ProviderInfo| {
+                        data.connected.is_empty() || data.connected.contains(&p.id)
+                    };
+                    final_options.model_selector.providers = data
+                        .all
+                        .iter()
+                        .filter(provider_filter)
+                        .map(|p| ModelProvider {
+                            id: p.id.clone(),
+                            name: p.name.clone(),
+                        })
+                        .collect();
                     final_options.model_selector.models = data
                         .all
                         .iter()
-                        .filter(|p| data.connected.contains(&p.id))
+                        .filter(provider_filter)
                         .flat_map(|p| this.transform_models(&p.models, &p.id))
                         .collect();
-
-                    yield patch::update_providers(final_options.model_selector.providers.clone());
-                    yield patch::update_models(final_options.model_selector.models.clone());
-                    yield patch::models_loaded();
-                }
-                Err(e) => {
+                } else if let Err(e) = &providers_result {
                     tracing::warn!("Failed to fetch OpenCode providers: {}", e);
                 }
             }
+
+            yield patch::update_providers(final_options.model_selector.providers.clone());
+            yield patch::update_models(final_options.model_selector.models.clone());
+            yield patch::models_loaded();
 
             match config_result {
                 Ok(config) => {

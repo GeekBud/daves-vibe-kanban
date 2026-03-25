@@ -1412,10 +1412,16 @@ export const scratchApi = {
 export const agentsApi = {
   getDiscoveredOptionsStreamUrl: (
     agent: BaseCodingAgent,
-    opts?: { workspaceId?: string; sessionId?: string; repoId?: string }
+    opts?: {
+      variant?: string | null;
+      workspaceId?: string;
+      sessionId?: string;
+      repoId?: string;
+    }
   ): string => {
     const params = new URLSearchParams();
     params.set('executor', agent);
+    if (opts?.variant) params.set('variant', opts.variant);
     if (opts?.workspaceId) params.set('workspace_id', opts.workspaceId);
     if (opts?.sessionId) params.set('session_id', opts.sessionId);
     if (opts?.repoId) params.set('repo_id', opts.repoId);

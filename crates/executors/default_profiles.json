@@ -33,6 +33,12 @@
         "OPENCODE": {
           "auto_approve": true
         }
+      },
+      "CODEMAKER": {
+        "OPENCODE": {
+          "auto_approve": true,
+          "base_command_override": "codemaker"
+        }
       }
     },
     "QWEN_CODE": {

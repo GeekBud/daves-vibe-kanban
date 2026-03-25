@@ -555,6 +555,8 @@ async fn get_agent_preset_options(
 pub struct ExecutorDiscoveredOptionsStreamQuery {
     executor: BaseCodingAgent,
     #[serde(default)]
+    variant: Option<String>,
+    #[serde(default)]
     session_id: Option<Uuid>,
     #[serde(default)]
     workspace_id: Option<Uuid>,
@@ -581,10 +583,16 @@ async fn handle_executor_discovered_options_ws(
 ) -> anyhow::Result<()> {
     use futures_util::StreamExt;
 
+    let executor_profile_id = query
+        .variant
+        .as_ref()
+        .map(|v| ExecutorProfileId::with_variant(query.executor.clone(), v.clone()))
+        .unwrap_or_else(|| ExecutorProfileId::new(query.executor));
+
     match deployment
         .container()
         .discover_executor_options(
-            ExecutorProfileId::new(query.executor),
+            executor_profile_id,
             query.session_id,
             query.workspace_id,
             query.repo_id,

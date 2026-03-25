@@ -24,17 +24,23 @@ const defaultOptions: ExecutorDiscoveredOptions = {
 
 function useExecutorDiscovery(
   agent: BaseCodingAgent | null | undefined,
-  opts?: { workspaceId?: string; sessionId?: string; repoId?: string }
+  opts?: {
+    variant?: string | null;
+    workspaceId?: string;
+    sessionId?: string;
+    repoId?: string;
+  }
 ) {
-  const { workspaceId, sessionId, repoId } = opts ?? {};
+  const { variant, workspaceId, sessionId, repoId } = opts ?? {};
   const endpoint = useMemo(() => {
     if (!agent) return undefined;
     return agentsApi.getDiscoveredOptionsStreamUrl(agent, {
+      variant,
       workspaceId,
       sessionId,
       repoId,
     });
-  }, [agent, workspaceId, sessionId, repoId]);
+  }, [agent, variant, workspaceId, sessionId, repoId]);
 
   const initialData = useCallback(
     (): ExecutorDiscoveryStreamState => ({
@@ -76,7 +82,12 @@ function useExecutorDiscovery(
 
 export function useModelSelectorConfig(
   agent: BaseCodingAgent | null | undefined,
-  opts?: { workspaceId?: string; sessionId?: string; repoId?: string }
+  opts?: {
+    variant?: string | null;
+    workspaceId?: string;
+    sessionId?: string;
+    repoId?: string;
+  }
 ) {
   const { options, error, isConnected, isInitialized } = useExecutorDiscovery(
     agent,

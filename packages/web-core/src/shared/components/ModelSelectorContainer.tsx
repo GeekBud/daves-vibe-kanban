@@ -106,6 +106,7 @@ export function ModelSelectorContainer({
     loadingModels,
     error: streamError,
   } = useModelSelectorConfig(agent, {
+    variant: executorConfig?.variant ?? null,
     workspaceId: sessionId ? workspaceId : undefined,
     sessionId,
   });

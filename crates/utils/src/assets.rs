@@ -4,6 +4,15 @@ use rust_embed::RustEmbed;
 const PROJECT_ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 pub fn asset_dir() -> std::path::PathBuf {
+    // Allow override via VK_ASSET_DIR (e.g. to reuse official app data in dev)
+    if let Ok(dir) = std::env::var("VK_ASSET_DIR") {
+        let path = std::path::PathBuf::from(dir);
+        if !path.exists() {
+            std::fs::create_dir_all(&path).expect("Failed to create VK_ASSET_DIR");
+        }
+        return path;
+    }
+
     let path = if cfg!(debug_assertions) {
         std::path::PathBuf::from(PROJECT_ROOT).join("../../dev_assets")
     } else {

@@ -100,9 +100,17 @@ stop_existing
 
 cd "$PROJECT_DIR"
 
-# 环境变量
-export VK_SHARED_API_BASE="https://api.vibekanban.com"
-export VK_ALLOWED_ORIGINS="http://localhost:3000"
+# 加载 .env 持久化配置（若存在）
+if [ -f "$PROJECT_DIR/.env" ]; then
+    set -a
+    source "$PROJECT_DIR/.env"
+    set +a
+    log_info "已加载 .env 配置"
+fi
+
+# 环境变量（.env 未覆盖时使用默认值）
+export VK_SHARED_API_BASE="${VK_SHARED_API_BASE:-https://api.vibekanban.com}"
+export VK_ALLOWED_ORIGINS="${VK_ALLOWED_ORIGINS:-http://localhost:3000}"
 export PATH="$HOME/.nvm/versions/node/$NODE_VERSION/bin:$PATH"
 
 # 清理日志

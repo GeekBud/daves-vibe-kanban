@@ -55,6 +55,15 @@ npx vibe-kanban
 
 Head to the [website](https://vibekanban.com/docs) for the latest documentation and user guides.
 
+## daves 版本扩展 Agent
+
+本 fork 额外支持以下 Agent：
+
+| Agent | 选择方式 | 前置条件 |
+|-------|----------|----------|
+| **CodeMaker** | OpenCode → CODEMAKER 变体 | 安装 [CodeMaker CLI](https://codemaker.netease.com)，执行 `codemaker` 登录 |
+| **Kimi Code** | Kimi Code | 安装 [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli)，执行 `kimi login` |
+
 ## Self-Hosting
 
 Want to host your own Vibe Kanban Cloud instance? See our [self-hosting guide](https://vibekanban.com/docs/self-hosting/deploy-docker).
@@ -124,6 +133,7 @@ The following environment variables can be configured at build time or runtime:
 | `MCP_PORT` | Runtime | Value of `BACKEND_PORT` | MCP server connection port |
 | `DISABLE_WORKTREE_CLEANUP` | Runtime | Not set | Disable all git worktree cleanup including orphan and expired workspace cleanup (for debugging) |
 | `VK_ALLOWED_ORIGINS` | Runtime | Not set | Comma-separated list of origins that are allowed to make backend API requests (e.g., `https://my-vibekanban-frontend.com`) |
+| `VK_ASSET_DIR` | Runtime | Not set | Override asset/data directory (e.g. reuse official app data: `~/Library/Application Support/ai.bloop.vibe-kanban` on macOS) |
 | `VK_SHARED_API_BASE` | Runtime | Not set | Base URL for the remote/cloud API used by the local desktop app |
 | `VK_SHARED_RELAY_API_BASE` | Runtime | Not set | Base URL for the relay API used by tunnel-mode connections |
 | `VK_TUNNEL` | Runtime | Not set | Enable relay tunnel mode when set (requires relay API base URL) |
