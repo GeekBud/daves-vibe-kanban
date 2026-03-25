@@ -2,12 +2,16 @@ use std::{collections::HashMap, sync::Arc};
 
 use api_types::LoginStatus;
 use async_trait::async_trait;
+use client_info::ClientInfo;
 use db::DBService;
-use deployment::{Deployment, DeploymentError, RemoteClientNotConfigured};
+use deployment::{Deployment, DeploymentError, RelayHostsNotConfigured, RemoteClientNotConfigured};
+use desktop_bridge::tunnel::TunnelManager;
 use executors::profile::ExecutorConfigs;
 use git::GitService;
+use preview_proxy::PreviewProxyService;
 use relay_control::{RelayControl, signing::RelaySigningService};
-use server_info::ServerInfo;
+use relay_hosts::RelayHosts;
+use remote_info::RemoteInfo;
 use services::services::{
     analytics::{AnalyticsConfig, AnalyticsContext, AnalyticsService, generate_user_id},
     approvals::Approvals,
@@ -24,7 +28,7 @@ use services::services::{
     remote_client::{RemoteClient, RemoteClientError},
     repo::RepoService,
 };
-use tokio::sync::RwLock;
+use tokio::sync::{Notify, RwLock};
 use trusted_key_auth::runtime::TrustedKeyAuthRuntime;
 use utils::{
     assets::{config_path, credentials_path, server_signing_key_path, trusted_keys_path},
@@ -57,14 +61,19 @@ pub struct LocalDeployment {
     approvals: Approvals,
     queued_message_service: QueuedMessageService,
     remote_client: Result<RemoteClient, RemoteClientNotConfigured>,
-    shared_api_base: Option<String>,
     auth_context: AuthContext,
     oauth_handoffs: Arc<RwLock<HashMap<Uuid, PendingHandoff>>>,
     trusted_key_auth: TrustedKeyAuthRuntime,
     relay_signing: RelaySigningService,
     relay_control: Arc<RelayControl>,
-    server_info: Arc<ServerInfo>,
+    client_info: ClientInfo,
+    remote_info: RemoteInfo,
+    preview_proxy: PreviewProxyService,
+    tunnel_manager: Arc<TunnelManager>,
+    relay_hosts: Option<Arc<RelayHosts>>,
+    ssh_config: Arc<russh::server::Config>,
     pty: PtyService,
+    pr_sync_notify: Arc<Notify>,
 }
 
 #[derive(Debug, Clone)]
@@ -157,9 +166,23 @@ impl Deployment for LocalDeployment {
         let api_base = std::env::var("VK_SHARED_API_BASE")
             .ok()
             .or_else(|| option_env!("VK_SHARED_API_BASE").map(|s| s.to_string()));
+        let relay_api_base = std::env::var("VK_SHARED_RELAY_API_BASE")
+            .ok()
+            .or_else(|| option_env!("VK_SHARED_RELAY_API_BASE").map(|s| s.to_string()));
+        let remote_info = RemoteInfo::new();
+        if let Some(api_base) = api_base.clone() {
+            remote_info
+                .set_api_base(api_base)
+                .expect("api_base already set");
+        }
+        if let Some(relay_api_base) = relay_api_base {
+            remote_info
+                .set_relay_api_base(relay_api_base)
+                .expect("relay_api_base already set");
+        }
 
-        let remote_client = match &api_base {
-            Some(url) => match RemoteClient::new(url, auth_context.clone()) {
+        let remote_client = match remote_info.get_api_base() {
+            Some(url) => match RemoteClient::new(&url, auth_context.clone()) {
                 Ok(client) => {
                     tracing::info!("Remote client initialized with URL: {}", url);
                     Ok(client)
@@ -180,7 +203,10 @@ impl Deployment for LocalDeployment {
         let relay_signing = RelaySigningService::load_or_generate(&server_signing_key_path())
             .expect("Failed to load or generate server signing key");
         let relay_control = Arc::new(RelayControl::new());
-        let server_info = Arc::new(ServerInfo::new());
+        let client_info = ClientInfo::new();
+        let preview_proxy = PreviewProxyService::new();
+
+        let ssh_config = embedded_ssh::config::build_config(relay_signing.signing_key());
 
         // We need to make analytics accessible to the ContainerService
         // TODO: Handle this more gracefully
@@ -208,6 +234,14 @@ impl Deployment for LocalDeployment {
         let file_search_cache = Arc::new(FileSearchCache::new());
 
         let pty = PtyService::new();
+        let tunnel_manager = Arc::new(TunnelManager::new(relay_signing.clone()));
+        let relay_hosts = match remote_client.clone().ok() {
+            Some(remote_client) => Some(Arc::new(
+                RelayHosts::load(remote_client, remote_info.clone(), relay_signing.clone()).await,
+            )),
+            None => None,
+        };
+        let pr_sync_notify = Arc::new(Notify::new());
         {
             let db = db.clone();
             let analytics = analytics.as_ref().map(|s| AnalyticsContext {
@@ -216,7 +250,7 @@ impl Deployment for LocalDeployment {
             });
             let container = container.clone();
             let rc = remote_client.clone().ok();
-            PrMonitorService::spawn(db, analytics, container, rc).await;
+            PrMonitorService::spawn(db, analytics, container, rc, pr_sync_notify.clone()).await;
         }
 
         let deployment = Self {
@@ -235,14 +269,19 @@ impl Deployment for LocalDeployment {
             approvals,
             queued_message_service,
             remote_client,
-            shared_api_base: api_base,
             auth_context,
             oauth_handoffs,
             trusted_key_auth,
             relay_signing,
             relay_control,
-            server_info,
+            client_info,
+            remote_info,
+            preview_proxy,
+            tunnel_manager,
+            relay_hosts,
+            ssh_config,
             pty,
+            pr_sync_notify,
         };
 
         Ok(deployment)
@@ -312,16 +351,28 @@ impl Deployment for LocalDeployment {
         &self.relay_signing
     }
 
-    fn server_info(&self) -> &Arc<ServerInfo> {
-        &self.server_info
+    fn client_info(&self) -> &ClientInfo {
+        &self.client_info
+    }
+
+    fn remote_info(&self) -> &RemoteInfo {
+        &self.remote_info
+    }
+
+    fn preview_proxy(&self) -> &PreviewProxyService {
+        &self.preview_proxy
+    }
+
+    fn tunnel_manager(&self) -> &Arc<TunnelManager> {
+        &self.tunnel_manager
+    }
+
+    fn relay_hosts(&self) -> Result<&Arc<RelayHosts>, RelayHostsNotConfigured> {
+        self.relay_hosts.as_ref().ok_or(RelayHostsNotConfigured)
     }
 
     fn trusted_key_auth(&self) -> &TrustedKeyAuthRuntime {
         &self.trusted_key_auth
-    }
-
-    fn shared_api_base(&self) -> Option<String> {
-        self.shared_api_base.clone()
     }
 }
 
@@ -337,12 +388,13 @@ impl LocalDeployment {
     pub async fn get_login_status(&self) -> LoginStatus {
         if self.auth_context.get_credentials().await.is_none() {
             self.auth_context.clear_profile().await;
+            self.auth_context.clear_remote_auth_degraded_slug().await;
             return LoginStatus::LoggedOut;
         };
 
         if let Some(cached_profile) = self.auth_context.cached_profile().await {
             return LoginStatus::LoggedIn {
-                profile: cached_profile,
+                profile: Some(cached_profile),
             };
         }
 
@@ -352,15 +404,33 @@ impl LocalDeployment {
 
         match client.profile().await {
             Ok(profile) => {
+                self.auth_context.clear_remote_auth_degraded_slug().await;
                 self.auth_context.set_profile(profile.clone()).await;
-                LoginStatus::LoggedIn { profile }
+                LoginStatus::LoggedIn {
+                    profile: Some(profile),
+                }
             }
             Err(RemoteClientError::Auth) => {
                 let _ = self.auth_context.clear_credentials().await;
                 self.auth_context.clear_profile().await;
+                self.auth_context.clear_remote_auth_degraded_slug().await;
                 LoginStatus::LoggedOut
             }
-            Err(_) => LoginStatus::LoggedOut,
+            Err(err) => {
+                if self.auth_context.get_credentials().await.is_none() {
+                    self.auth_context.clear_profile().await;
+                    self.auth_context.clear_remote_auth_degraded_slug().await;
+                    return LoginStatus::LoggedOut;
+                }
+
+                self.auth_context
+                    .set_remote_auth_degraded_slug(
+                        err.degraded_slug()
+                            .unwrap_or_else(RemoteClientError::generic_degraded_slug),
+                    )
+                    .await;
+                LoginStatus::LoggedIn { profile: None }
+            }
         }
     }
 
@@ -389,5 +459,13 @@ impl LocalDeployment {
 
     pub fn pty(&self) -> &PtyService {
         &self.pty
+    }
+
+    pub fn ssh_config(&self) -> &Arc<russh::server::Config> {
+        &self.ssh_config
+    }
+
+    pub fn trigger_pr_sync(&self) {
+        self.pr_sync_notify.notify_one();
     }
 }
