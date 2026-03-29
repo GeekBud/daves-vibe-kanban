@@ -253,7 +253,7 @@ export function PierreDiffCard({
         acc +
         hunk.hunkContent.reduce((count, content) => {
           if (content.type === 'change') {
-            return count + (content as ChangeContent).additions.length;
+            return count + (content as ChangeContent).additions;
           }
           return count;
         }, 0)
@@ -267,7 +267,7 @@ export function PierreDiffCard({
         acc +
         hunk.hunkContent.reduce((count, content) => {
           if (content.type === 'change') {
-            return count + (content as ChangeContent).deletions.length;
+            return count + (content as ChangeContent).deletions;
           }
           return count;
         }, 0)

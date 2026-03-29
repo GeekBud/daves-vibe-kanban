@@ -209,8 +209,8 @@ export function useDiffData(
           for (const content of hunk.hunkContent) {
             if (content.type === 'change') {
               const change = content as ChangeContent;
-              additions += change.additions.length;
-              deletions += change.deletions.length;
+              additions += change.additions;
+              deletions += change.deletions;
             }
           }
         }
