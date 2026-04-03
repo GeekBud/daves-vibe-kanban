@@ -68,13 +68,32 @@ pub struct KimiFunctionCall {
     pub arguments: String,
 }
 
+/// Helper enum to handle content that can be either a string or an array of blocks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum KimiContent {
+    Text(String),
+    Blocks(Vec<KimiContentBlock>),
+}
+
+impl KimiContent {
+    fn into_blocks(self) -> Vec<KimiContentBlock> {
+        match self {
+            KimiContent::Text(text) => vec![KimiContentBlock::Text { text }],
+            KimiContent::Blocks(blocks) => blocks,
+        }
+    }
+}
+
 /// Kimi's stream-json output format (role-based)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KimiMessage {
     pub role: KimiRole,
-    pub content: Vec<KimiContentBlock>,
+    pub content: KimiContent,
     #[serde(default)]
     pub tool_calls: Vec<KimiToolCall>,
+    #[serde(default)]
+    pub tool_call_id: Option<String>,
 }
 
 /// Parse Kimi JSON output lines
@@ -429,8 +448,9 @@ impl StandardCodingAgentExecutor for KimiCode {
                     Some(ParsedKimiEvent::Message(msg)) => {
                         match msg.role {
                             KimiRole::Assistant => {
-                                // First handle content blocks (thinking/text)
-                                for block in &msg.content {
+                                // Convert content to blocks (handles both string and array formats)
+                                let content_blocks = msg.content.into_blocks();
+                                for block in content_blocks {
                                     match block {
                                         KimiContentBlock::Think { think, .. } => {
                                             // Skip thinking blocks that just describe tool calls
@@ -448,7 +468,7 @@ impl StandardCodingAgentExecutor for KimiCode {
                                                         Some(entry_index_provider.next());
                                                 }
                                                 if let Some(ref mut t) = current_thinking {
-                                                    t.push_str(think);
+                                                    t.push_str(&think);
                                                     let entry = NormalizedEntry {
                                                         timestamp: None,
                                                         entry_type: NormalizedEntryType::Thinking,
@@ -480,7 +500,7 @@ impl StandardCodingAgentExecutor for KimiCode {
                                                 message_index = Some(entry_index_provider.next());
                                             }
                                             if let Some(ref mut m) = current_message {
-                                                m.push_str(text);
+                                                m.push_str(&text);
                                                 let entry = NormalizedEntry {
                                                     timestamp: None,
                                                     entry_type:
@@ -543,15 +563,17 @@ impl StandardCodingAgentExecutor for KimiCode {
                                 }
                             }
                             KimiRole::Tool => {
-                                // Tool result - extract from content
-                                let content_text: String = msg
-                                    .content
-                                    .iter()
-                                    .map(|c| match c {
-                                        KimiContentBlock::Text { text } => text.clone(),
-                                        KimiContentBlock::Think { think, .. } => think.clone(),
-                                    })
-                                    .collect();
+                                // Tool result - extract from content (handles string or array)
+                                let content_text: String = match &msg.content {
+                                    KimiContent::Text(text) => text.clone(),
+                                    KimiContent::Blocks(blocks) => blocks
+                                        .iter()
+                                        .map(|c| match c {
+                                            KimiContentBlock::Text { text } => text.clone(),
+                                            KimiContentBlock::Think { think, .. } => think.clone(),
+                                        })
+                                        .collect(),
+                                };
 
                                 // Find matching tool call if any (using first pending as approximation)
                                 // Kimi doesn't consistently link tool results to calls via ID in the stream
@@ -758,8 +780,9 @@ mod tests {
         let json_line = r#"{"role":"assistant","content":[{"type":"text","text":"Hello world"}]}"#;
         let msg = serde_json::from_str::<KimiMessage>(json_line).unwrap();
         assert!(matches!(msg.role, KimiRole::Assistant));
-        assert_eq!(msg.content.len(), 1);
-        match &msg.content[0] {
+        let blocks = msg.content.into_blocks();
+        assert_eq!(blocks.len(), 1);
+        match &blocks[0] {
             KimiContentBlock::Text { text } => assert_eq!(text, "Hello world"),
             _ => panic!("Expected Text block"),
         }
@@ -768,15 +791,26 @@ mod tests {
         let json_think = r#"{"role":"assistant","content":[{"type":"think","think":"Let me think about this"}]}"#;
         let msg_think = serde_json::from_str::<KimiMessage>(json_think).unwrap();
         assert!(matches!(msg_think.role, KimiRole::Assistant));
-        match &msg_think.content[0] {
+        let blocks_think = msg_think.content.into_blocks();
+        match &blocks_think[0] {
             KimiContentBlock::Think { think, .. } => assert_eq!(think, "Let me think about this"),
             _ => panic!("Expected Think block"),
         }
 
-        // Test tool result format
-        let json_tool = r#"{"role":"tool","content":[{"type":"text","text":"Tool output here"}]}"#;
-        let msg_tool = serde_json::from_str::<KimiMessage>(json_tool).unwrap();
-        assert!(matches!(msg_tool.role, KimiRole::Tool));
+        // Test tool result format with string content (the problematic format)
+        let json_tool_str = r#"{"role":"tool","content":"Tool output as string","tool_call_id":"tool_123"}"#;
+        let msg_tool_str = serde_json::from_str::<KimiMessage>(json_tool_str).unwrap();
+        assert!(matches!(msg_tool_str.role, KimiRole::Tool));
+        match msg_tool_str.content {
+            KimiContent::Text(text) => assert_eq!(text, "Tool output as string"),
+            _ => panic!("Expected Text content for tool result"),
+        }
+        assert_eq!(msg_tool_str.tool_call_id, Some("tool_123".to_string()));
+
+        // Test tool result format with array content
+        let json_tool_arr = r#"{"role":"tool","content":[{"type":"text","text":"Tool output here"}]}"#;
+        let msg_tool_arr = serde_json::from_str::<KimiMessage>(json_tool_arr).unwrap();
+        assert!(matches!(msg_tool_arr.role, KimiRole::Tool));
 
         // Test parse_kimi_line
         let event = parse_kimi_line(json_line).unwrap();
