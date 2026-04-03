@@ -65,5 +65,8 @@
     "node": ">=20",
     "pnpm": ">=8"
   },
-  "packageManager": "pnpm@10.13.1"
+  "packageManager": "pnpm@10.13.1",
+  "dependencies": {
+    "@pierre/diffs": "^1.1.7"
+  }
 }
