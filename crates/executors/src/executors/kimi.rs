@@ -53,11 +53,28 @@ pub enum KimiContentBlock {
     },
 }
 
+/// Kimi tool call structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KimiToolCall {
+    #[serde(rename = "type")]
+    pub call_type: String,
+    pub id: String,
+    pub function: KimiFunctionCall,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KimiFunctionCall {
+    pub name: String,
+    pub arguments: String,
+}
+
 /// Kimi's stream-json output format (role-based)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KimiMessage {
     pub role: KimiRole,
     pub content: Vec<KimiContentBlock>,
+    #[serde(default)]
+    pub tool_calls: Vec<KimiToolCall>,
 }
 
 /// Parse Kimi JSON output lines
@@ -90,6 +107,67 @@ fn parse_kimi_line(line: &str) -> Option<ParsedKimiEvent> {
 
     // Treat as raw output if not recognized
     Some(ParsedKimiEvent::RawLog(line.to_string()))
+}
+
+/// Parse tool arguments JSON into action type
+fn parse_tool_arguments(
+    tool_name: &str,
+    arguments: &str,
+) -> (Option<String>, Option<serde_json::Value>) {
+    match serde_json::from_str::<serde_json::Value>(arguments) {
+        Ok(args) => {
+            let display_name = match tool_name {
+                "ReadFile" => args.get("path").and_then(|v| v.as_str()).map(|p| format!("Read {}", p)),
+                "WriteFile" => args.get("path").and_then(|v| v.as_str()).map(|p| format!("Write {}", p)),
+                "StrReplaceFile" => args.get("path").and_then(|v| v.as_str()).map(|p| format!("Edit {}", p)),
+                "Shell" => args.get("command").and_then(|v| v.as_str()).map(|c| format!("Shell: {}", c)),
+                "Grep" => args.get("pattern").and_then(|v| v.as_str()).map(|p| format!("Search: {}", p)),
+                "Glob" => args.get("pattern").and_then(|v| v.as_str()).map(|p| format!("Glob: {}", p)),
+                _ => Some(format!("{} tool", tool_name)),
+            };
+            (display_name, Some(args))
+        }
+        Err(_) => (Some(format!("{} tool", tool_name)), None),
+    }
+}
+
+/// Parse tool arguments into ActionType
+fn parse_action_type(
+    tool_name: &str,
+    args: Option<&serde_json::Value>,
+) -> crate::logs::ActionType {
+    use crate::logs::ActionType;
+    use crate::logs::utils::shell_command_parsing::CommandCategory;
+    
+    match tool_name {
+        "ReadFile" => ActionType::FileRead {
+            path: args.and_then(|a| a.get("path")).and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+        },
+        "WriteFile" => ActionType::FileEdit {
+            path: args.and_then(|a| a.get("path")).and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+            changes: vec![],
+        },
+        "StrReplaceFile" => ActionType::FileEdit {
+            path: args.and_then(|a| a.get("path")).and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+            changes: vec![],
+        },
+        "Shell" => ActionType::CommandRun {
+            command: args.and_then(|a| a.get("command")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            result: None,
+            category: CommandCategory::Other,
+        },
+        "Grep" => ActionType::Search {
+            query: args.and_then(|a| a.get("pattern")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        },
+        "Glob" => ActionType::Search {
+            query: args.and_then(|a| a.get("pattern")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        },
+        _ => ActionType::Tool {
+            tool_name: tool_name.to_string(),
+            arguments: args.cloned(),
+            result: None,
+        },
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -313,16 +391,22 @@ impl StandardCodingAgentExecutor for KimiCode {
 
         // Process stdout JSON lines
         let h2 = tokio::spawn(async move {
-            // NOTE: This sleep is a conservative measure to ensure session_id is set by spawn()
-            // before we try to read it. In practice, the framework call order guarantees that
-            // spawn() completes before normalize_logs() is called (spawn sets session_id before
-            // returning SpawnedChild). However, since both operations are async and run on
-            // different tasks, we use a small delay as a safety margin.
-            // TODO: Consider replacing with deterministic synchronization (e.g., oneshot channel)
-            // if this becomes a reliability concern.
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            if let Some(session_id) = session_id_for_logs.lock().await.as_ref() {
-                msg_store.push_session_id(session_id.clone());
+            // Wait for session_id to be set by spawn() using a short retry loop
+            // instead of fixed sleep for faster response
+            let session_id = {
+                let mut id = None;
+                for _ in 0..50 {
+                    // Max 500ms wait
+                    if let Some(sid) = session_id_for_logs.lock().await.as_ref() {
+                        id = Some(sid.clone());
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                id
+            };
+            if let Some(sid) = session_id {
+                msg_store.push_session_id(sid);
             }
 
             let mut lines = msg_store.stdout_lines_stream();
@@ -331,6 +415,9 @@ impl StandardCodingAgentExecutor for KimiCode {
             let mut current_message: Option<String> = None;
             let mut thinking_index: Option<usize> = None;
             let mut message_index: Option<usize> = None;
+            // Track tool calls to match with tool results
+            let mut pending_tool_calls: std::collections::HashMap<String, (String, usize)> =
+                std::collections::HashMap::new();
 
             while let Some(Ok(line)) = lines.next().await {
                 if line.trim().is_empty() {
@@ -342,42 +429,49 @@ impl StandardCodingAgentExecutor for KimiCode {
                     Some(ParsedKimiEvent::Message(msg)) => {
                         match msg.role {
                             KimiRole::Assistant => {
-                                for block in msg.content {
+                                // First handle content blocks (thinking/text)
+                                for block in &msg.content {
                                     match block {
                                         KimiContentBlock::Think { think, .. } => {
-                                            // Start or update thinking
-                                            current_message = None;
-                                            message_index = None;
+                                            // Skip thinking blocks that just describe tool calls
+                                            // if they are followed by actual tool_calls
+                                            if msg.tool_calls.is_empty()
+                                                || think.len() < 100
+                                                || !think.contains("tool")
+                                            {
+                                                current_message = None;
+                                                message_index = None;
 
-                                            if current_thinking.is_none() {
-                                                current_thinking = Some(String::new());
-                                                thinking_index = Some(entry_index_provider.next());
-                                            }
-                                            if let Some(ref mut t) = current_thinking {
-                                                t.push_str(&think);
-                                                let entry = NormalizedEntry {
-                                                    timestamp: None,
-                                                    entry_type: NormalizedEntryType::Thinking,
-                                                    content: t.clone(),
-                                                    metadata: None,
-                                                };
-                                                if let Some(idx) = thinking_index {
-                                                    if t.len() == think.len() {
-                                                        msg_store.push_patch(
-                                                            ConversationPatch::add_normalized_entry(
-                                                                idx, entry,
-                                                            ),
-                                                        );
-                                                    } else {
-                                                        msg_store.push_patch(
-                                                            ConversationPatch::replace(idx, entry),
-                                                        );
+                                                if current_thinking.is_none() {
+                                                    current_thinking = Some(String::new());
+                                                    thinking_index =
+                                                        Some(entry_index_provider.next());
+                                                }
+                                                if let Some(ref mut t) = current_thinking {
+                                                    t.push_str(think);
+                                                    let entry = NormalizedEntry {
+                                                        timestamp: None,
+                                                        entry_type: NormalizedEntryType::Thinking,
+                                                        content: t.clone(),
+                                                        metadata: None,
+                                                    };
+                                                    if let Some(idx) = thinking_index {
+                                                        if t.len() == think.len() {
+                                                            msg_store.push_patch(
+                                                                ConversationPatch::add_normalized_entry(
+                                                                    idx, entry,
+                                                                ),
+                                                            );
+                                                        } else {
+                                                            msg_store.push_patch(
+                                                                ConversationPatch::replace(idx, entry),
+                                                            );
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                         KimiContentBlock::Text { text } => {
-                                            // End thinking, start message
                                             current_thinking = None;
                                             thinking_index = None;
 
@@ -386,7 +480,7 @@ impl StandardCodingAgentExecutor for KimiCode {
                                                 message_index = Some(entry_index_provider.next());
                                             }
                                             if let Some(ref mut m) = current_message {
-                                                m.push_str(&text);
+                                                m.push_str(text);
                                                 let entry = NormalizedEntry {
                                                     timestamp: None,
                                                     entry_type:
@@ -411,9 +505,45 @@ impl StandardCodingAgentExecutor for KimiCode {
                                         }
                                     }
                                 }
+
+                                // Handle tool_calls - display as ToolUse entries
+                                for tool_call in &msg.tool_calls {
+                                    let tool_name = tool_call.function.name.clone();
+                                    let tool_id = tool_call.id.clone();
+                                    let arguments = tool_call.function.arguments.clone();
+
+                                    let (display_name, parsed_args) =
+                                        parse_tool_arguments(&tool_name, &arguments);
+
+                                    let idx = entry_index_provider.next();
+                                    let summary = display_name.unwrap_or_else(|| {
+                                        format!("{} tool", tool_name)
+                                    });
+
+                                    let entry = NormalizedEntry {
+                                        timestamp: None,
+                                        entry_type: NormalizedEntryType::ToolUse {
+                                            tool_name: summary.clone(),
+                                            action_type: parse_action_type(&tool_name, parsed_args.as_ref()),
+                                            status: crate::logs::ToolStatus::Success,
+                                        },
+                                        content: summary.clone(),
+                                        metadata: Some(serde_json::json!({
+                                            "tool_id": tool_id.clone(),
+                                            "tool_name": tool_name,
+                                            "arguments": arguments,
+                                        })),
+                                    };
+                                    msg_store.push_patch(
+                                        ConversationPatch::add_normalized_entry(idx, entry),
+                                    );
+
+                                    // Store for matching with tool result
+                                    pending_tool_calls.insert(tool_id, (summary, idx));
+                                }
                             }
                             KimiRole::Tool => {
-                                // Tool result - display as system message or tool use
+                                // Tool result - extract from content
                                 let content_text: String = msg
                                     .content
                                     .iter()
@@ -423,28 +553,43 @@ impl StandardCodingAgentExecutor for KimiCode {
                                     })
                                     .collect();
 
-                                // Add truncation marker if content is long
-                                const MAX_TOOL_RESULT_LEN: usize = 500;
-                                let display_text = if content_text.len() > MAX_TOOL_RESULT_LEN {
+                                // Find matching tool call if any (using first pending as approximation)
+                                // Kimi doesn't consistently link tool results to calls via ID in the stream
+                                let tool_name = pending_tool_calls
+                                    .values()
+                                    .next()
+                                    .map(|(name, _)| name.clone())
+                                    .unwrap_or_else(|| "Tool".to_string());
+
+                                // Add as a tool result entry with proper tool_use type
+                                let idx = entry_index_provider.next();
+                                let display_text = if content_text.len() > 500 {
                                     format!(
-                                        "{}... [truncated {} chars]",
-                                        &content_text[..MAX_TOOL_RESULT_LEN],
-                                        content_text.len() - MAX_TOOL_RESULT_LEN
+                                        "{}... [{} more chars]",
+                                        &content_text[..500],
+                                        content_text.len() - 500
                                     )
                                 } else {
                                     content_text.clone()
                                 };
 
-                                let idx = entry_index_provider.next();
                                 let entry = NormalizedEntry {
                                     timestamp: None,
-                                    entry_type: NormalizedEntryType::SystemMessage,
-                                    content: format!("Tool result: {}", display_text),
-                                    metadata: None,
+                                    entry_type: NormalizedEntryType::ToolUse {
+                                        tool_name: tool_name.clone(),
+                                        action_type: crate::logs::ActionType::Other {
+                                            description: "Tool execution result".to_string(),
+                                        },
+                                        status: crate::logs::ToolStatus::Success,
+                                    },
+                                    content: display_text,
+                                    metadata: Some(serde_json::json!({
+                                        "is_result": true,
+                                    })),
                                 };
-                                msg_store.push_patch(ConversationPatch::add_normalized_entry(
-                                    idx, entry,
-                                ));
+                                msg_store.push_patch(
+                                    ConversationPatch::add_normalized_entry(idx, entry),
+                                );
                             }
                             _ => {}
                         }
