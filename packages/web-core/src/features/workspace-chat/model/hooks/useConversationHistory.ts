@@ -257,36 +257,69 @@ export const useConversationHistory = ({
     [loadRunningAndEmit]
   );
 
+  // 并发限制：同时最多 20 个 process 加载
+  const MAX_CONCURRENT_LOADS = 20;
+
+  // 带并发限制的并行加载工具函数
+  const loadProcessesWithLimit = async (
+    processes: ExecutionProcess[],
+    onProcessLoaded: (result: {
+      process: ExecutionProcess;
+      entries: PatchTypeWithKey[];
+    }) => boolean // 返回 true 表示继续加载，false 表示停止
+  ): Promise<void> => {
+    // 将 processes 分成多个 batch，每个 batch 最多 MAX_CONCURRENT_LOADS 个
+    for (let i = 0; i < processes.length; i += MAX_CONCURRENT_LOADS) {
+      const batch = processes.slice(i, i + MAX_CONCURRENT_LOADS);
+
+      // 并行加载当前 batch
+      const batchResults = await Promise.all(
+        batch.map(async (executionProcess) => {
+          const entries = await loadEntriesForHistoricExecutionProcess(executionProcess);
+          const entriesWithKey = entries.map((e, idx) =>
+            patchWithKey(e, executionProcess.id, idx)
+          );
+          return { process: executionProcess, entries: entriesWithKey };
+        })
+      );
+
+      // 按原始顺序处理结果（保持时间线顺序）
+      for (const result of batchResults) {
+        const shouldContinue = onProcessLoaded(result);
+        if (!shouldContinue) return;
+      }
+    }
+  };
+
   const loadHistoricEntries = useCallback(
     async (maxEntries?: number): Promise<ExecutionProcessStateStore> => {
       const localDisplayedExecutionProcesses: ExecutionProcessStateStore = {};
 
       if (!executionProcesses?.current) return localDisplayedExecutionProcesses;
 
-      for (const executionProcess of [
-        ...executionProcesses.current,
-      ].reverse()) {
-        if (executionProcess.status === ExecutionProcessStatus.running)
-          continue;
+      // 过滤掉 running 状态的 process，并按时间倒序（最新的在前）
+      const historicProcesses = [...executionProcesses.current]
+        .reverse()
+        .filter((p) => p.status !== ExecutionProcessStatus.running);
 
-        const entries =
-          await loadEntriesForHistoricExecutionProcess(executionProcess);
-        const entriesWithKey = entries.map((e, idx) =>
-          patchWithKey(e, executionProcess.id, idx)
-        );
+      await loadProcessesWithLimit(
+        historicProcesses,
+        ({ process, entries }) => {
+          localDisplayedExecutionProcesses[process.id] = {
+            executionProcess: process,
+            entries,
+          };
 
-        localDisplayedExecutionProcesses[executionProcess.id] = {
-          executionProcess,
-          entries: entriesWithKey,
-        };
-
-        if (
-          maxEntries != null &&
-          flattenEntries(localDisplayedExecutionProcesses).length > maxEntries
-        ) {
-          break;
+          // 如果已达到 maxEntries，停止加载
+          if (
+            maxEntries != null &&
+            flattenEntries(localDisplayedExecutionProcesses).length > maxEntries
+          ) {
+            return false; // 停止加载
+          }
+          return true; // 继续加载
         }
-      }
+      );
 
       return localDisplayedExecutionProcesses;
     },
@@ -297,38 +330,39 @@ export const useConversationHistory = ({
     async (batchSize: number): Promise<boolean> => {
       if (!executionProcesses?.current) return false;
 
-      let anyUpdated = false;
-      for (const executionProcess of [
-        ...executionProcesses.current,
-      ].reverse()) {
-        const current = displayedExecutionProcesses.current;
-        if (
-          current[executionProcess.id] ||
-          executionProcess.status === ExecutionProcessStatus.running
-        )
-          continue;
-
-        const entries =
-          await loadEntriesForHistoricExecutionProcess(executionProcess);
-        const entriesWithKey = entries.map((e, idx) =>
-          patchWithKey(e, executionProcess.id, idx)
+      // 获取尚未加载的 historic processes
+      const current = displayedExecutionProcesses.current;
+      const remainingProcesses = [...executionProcesses.current]
+        .reverse()
+        .filter(
+          (p) =>
+            !current[p.id] && p.status !== ExecutionProcessStatus.running
         );
 
-        mergeIntoDisplayed((state) => {
-          state[executionProcess.id] = {
-            executionProcess,
-            entries: entriesWithKey,
-          };
-        });
+      if (remainingProcesses.length === 0) return false;
 
-        if (
-          flattenEntries(displayedExecutionProcesses.current).length > batchSize
-        ) {
+      let anyUpdated = false;
+
+      await loadProcessesWithLimit(
+        remainingProcesses,
+        ({ process, entries }) => {
+          mergeIntoDisplayed((state) => {
+            state[process.id] = {
+              executionProcess: process,
+              entries,
+            };
+          });
+
           anyUpdated = true;
-          break;
+
+          // 如果已达到 batchSize，停止加载
+          if (flattenEntries(displayedExecutionProcesses.current).length > batchSize) {
+            return false; // 停止加载
+          }
+          return true; // 继续加载
         }
-        anyUpdated = true;
-      }
+      );
+
       return anyUpdated;
     },
     [executionProcesses]
