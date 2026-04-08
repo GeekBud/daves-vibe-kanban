@@ -96,6 +96,9 @@ export const useConversationHistory = ({
   const loadEntriesForHistoricExecutionProcess = (
     executionProcess: ExecutionProcess
   ) => {
+    const startTime = performance.now();
+    const processId = executionProcess.id.slice(0, 8);
+    
     let url = '';
     if (executionProcess.executor_action.typ.type === 'ScriptRequest') {
       url = `/api/execution-processes/${executionProcess.id}/raw-logs/ws`;
@@ -103,15 +106,20 @@ export const useConversationHistory = ({
       url = `/api/execution-processes/${executionProcess.id}/normalized-logs/ws`;
     }
 
+    console.log(`[History Load] Process ${processId} - Starting load, type: ${executionProcess.executor_action.typ.type}, status: ${executionProcess.status}`);
+
     return new Promise<PatchType[]>((resolve) => {
       const controller = streamJsonPatchEntries<PatchType>(url, {
         onFinished: (allEntries) => {
+          const duration = performance.now() - startTime;
+          console.log(`[History Load] Process ${processId} - Finished, entries: ${allEntries.length}, time: ${duration.toFixed(1)}ms`);
           controller.close();
           resolve(allEntries);
         },
         onError: (err) => {
+          const duration = performance.now() - startTime;
           console.warn(
-            `Error loading entries for historic execution process ${executionProcess.id}`,
+            `[History Load] Process ${processId} - Error after ${duration.toFixed(1)}ms:`,
             err
           );
           controller.close();
@@ -268,9 +276,19 @@ export const useConversationHistory = ({
       entries: PatchTypeWithKey[];
     }) => boolean // 返回 true 表示继续加载，false 表示停止
   ): Promise<void> => {
+    const totalStartTime = performance.now();
+    const totalProcesses = processes.length;
+    
+    console.log(`[History Load] Starting batch load: ${totalProcesses} processes, batch size: ${MAX_CONCURRENT_LOADS}`);
+    
     // 将 processes 分成多个 batch，每个 batch 最多 MAX_CONCURRENT_LOADS 个
     for (let i = 0; i < processes.length; i += MAX_CONCURRENT_LOADS) {
       const batch = processes.slice(i, i + MAX_CONCURRENT_LOADS);
+      const batchNum = Math.floor(i / MAX_CONCURRENT_LOADS) + 1;
+      const totalBatches = Math.ceil(processes.length / MAX_CONCURRENT_LOADS);
+      
+      console.log(`[History Load] Batch ${batchNum}/${totalBatches}: loading ${batch.length} processes concurrently`);
+      const batchStartTime = performance.now();
 
       // 并行加载当前 batch
       const batchResults = await Promise.all(
@@ -282,25 +300,42 @@ export const useConversationHistory = ({
           return { process: executionProcess, entries: entriesWithKey };
         })
       );
+      
+      const batchDuration = performance.now() - batchStartTime;
+      console.log(`[History Load] Batch ${batchNum}/${totalBatches}: completed in ${batchDuration.toFixed(1)}ms`);
 
       // 按原始顺序处理结果（保持时间线顺序）
       for (const result of batchResults) {
         const shouldContinue = onProcessLoaded(result);
-        if (!shouldContinue) return;
+        if (!shouldContinue) {
+          const totalDuration = performance.now() - totalStartTime;
+          console.log(`[History Load] Early stop after ${totalDuration.toFixed(1)}ms`);
+          return;
+        }
       }
     }
+    
+    const totalDuration = performance.now() - totalStartTime;
+    console.log(`[History Load] All batches completed: ${totalProcesses} processes in ${totalDuration.toFixed(1)}ms`);
   };
 
   const loadHistoricEntries = useCallback(
     async (maxEntries?: number): Promise<ExecutionProcessStateStore> => {
+      const startTime = performance.now();
       const localDisplayedExecutionProcesses: ExecutionProcessStateStore = {};
 
-      if (!executionProcesses?.current) return localDisplayedExecutionProcesses;
+      if (!executionProcesses?.current) {
+        console.log('[History Load] loadHistoricEntries: no processes to load');
+        return localDisplayedExecutionProcesses;
+      }
 
       // 过滤掉 running 状态的 process，并按时间倒序（最新的在前）
       const historicProcesses = [...executionProcesses.current]
         .reverse()
         .filter((p) => p.status !== ExecutionProcessStatus.running);
+      
+      const runningCount = executionProcesses.current.length - historicProcesses.length;
+      console.log(`[History Load] loadHistoricEntries: ${historicProcesses.length} historic (skipped ${runningCount} running), maxEntries: ${maxEntries ?? 'none'}`);
 
       await loadProcessesWithLimit(
         historicProcesses,
@@ -309,17 +344,25 @@ export const useConversationHistory = ({
             executionProcess: process,
             entries,
           };
+          
+          const currentCount = flattenEntries(localDisplayedExecutionProcesses).length;
 
           // 如果已达到 maxEntries，停止加载
           if (
             maxEntries != null &&
-            flattenEntries(localDisplayedExecutionProcesses).length > maxEntries
+            currentCount > maxEntries
           ) {
+            console.log(`[History Load] loadHistoricEntries: reached maxEntries ${maxEntries}, stopping`);
             return false; // 停止加载
           }
           return true; // 继续加载
         }
       );
+      
+      const totalDuration = performance.now() - startTime;
+      const loadedCount = Object.keys(localDisplayedExecutionProcesses).length;
+      const entryCount = flattenEntries(localDisplayedExecutionProcesses).length;
+      console.log(`[History Load] loadHistoricEntries: completed - ${loadedCount} processes, ${entryCount} entries in ${totalDuration.toFixed(1)}ms`);
 
       return localDisplayedExecutionProcesses;
     },
@@ -328,7 +371,12 @@ export const useConversationHistory = ({
 
   const loadRemainingEntriesInBatches = useCallback(
     async (batchSize: number): Promise<boolean> => {
-      if (!executionProcesses?.current) return false;
+      const startTime = performance.now();
+      
+      if (!executionProcesses?.current) {
+        console.log('[History Load] loadRemainingEntriesInBatches: no processes');
+        return false;
+      }
 
       // 获取尚未加载的 historic processes
       const current = displayedExecutionProcesses.current;
@@ -339,7 +387,12 @@ export const useConversationHistory = ({
             !current[p.id] && p.status !== ExecutionProcessStatus.running
         );
 
-      if (remainingProcesses.length === 0) return false;
+      if (remainingProcesses.length === 0) {
+        console.log('[History Load] loadRemainingEntriesInBatches: no remaining processes');
+        return false;
+      }
+      
+      console.log(`[History Load] loadRemainingEntriesInBatches: ${remainingProcesses.length} remaining, batchSize: ${batchSize}`);
 
       let anyUpdated = false;
 
@@ -356,12 +409,17 @@ export const useConversationHistory = ({
           anyUpdated = true;
 
           // 如果已达到 batchSize，停止加载
-          if (flattenEntries(displayedExecutionProcesses.current).length > batchSize) {
+          const currentCount = flattenEntries(displayedExecutionProcesses.current).length;
+          if (currentCount > batchSize) {
+            console.log(`[History Load] loadRemainingEntriesInBatches: reached batchSize ${batchSize} (${currentCount} entries), stopping`);
             return false; // 停止加载
           }
           return true; // 继续加载
         }
       );
+      
+      const totalDuration = performance.now() - startTime;
+      console.log(`[History Load] loadRemainingEntriesInBatches: completed - updated: ${anyUpdated} in ${totalDuration.toFixed(1)}ms`);
 
       return anyUpdated;
     },
