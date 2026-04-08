@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
 } from './Dropdown';
 import { PrimaryButton } from './PrimaryButton';
+import { SkillsInput } from './SkillsInput';
 import type { LocalAttachmentMetadata } from './WorkspaceContext';
 import { ToolbarDropdown, ToolbarIconButton } from './Toolbar';
 import { ContextUsageGauge, type ContextUsageInfo } from './ContextUsageGauge';
@@ -193,6 +194,12 @@ interface SessionChatBoxProps<TExecutor extends string = string> {
   tokenUsageInfo?: ContextUsageInfo | null;
   supportsContextUsage?: boolean;
   dropzone?: DropzoneProps;
+  skillsInput?: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    workspaceId?: string;
+  };
 }
 
 function defaultExecutorLabel(executor: string) {
@@ -248,6 +255,7 @@ export function SessionChatBox<TExecutor extends string = string>({
   onPrCommentClick,
   onViewCode,
   onOpenWorkspace,
+  skillsInput,
   onScrollToPreviousMessage,
   userMessageTurns,
   onScrollToUserMessage,
@@ -733,7 +741,19 @@ export function SessionChatBox<TExecutor extends string = string>({
                       actionIcon={ArrowsOutIcon}
                       className="min-w-0"
                     />
-                  ) : onViewCode ? (
+                  ) : null}
+                  {skillsInput && (
+                    <div className="w-48">
+                      <SkillsInput
+                        value={skillsInput.value}
+                        onChange={skillsInput.onChange}
+                        placeholder={skillsInput.placeholder || 'Type @ for skills...'}
+                        disabled={isDisabled}
+                        workspaceId={skillsInput.workspaceId}
+                      />
+                    </div>
+                  )}
+                  {onOpenWorkspace ? null : onViewCode ? (
                     <PrimaryButton
                       variant="tertiary"
                       onClick={onViewCode}

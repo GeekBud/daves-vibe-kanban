@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDropzone } from 'react-dropzone';
 import {
@@ -169,6 +169,9 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
 
   const sessionId = session?.id;
   const queryClient = useQueryClient();
+
+  // Skills input state
+  const [skillsInputValue, setSkillsInputValue] = useState('');
 
   const handleRenameSession = useCallback(
     (targetSessionId: string, currentName: string) => {
@@ -496,7 +499,12 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
   });
 
   const handleSend = useCallback(async () => {
-    const { prompt, isSlashCommand } = buildAgentPrompt(localMessage, [
+    // Prepend skills to message if present
+    const messageWithSkills = skillsInputValue.trim()
+      ? `[Using skill: ${skillsInputValue.trim()}]\n\n${localMessage}`
+      : localMessage;
+    
+    const { prompt, isSlashCommand } = buildAgentPrompt(messageWithSkills, [
       reviewMarkdown,
     ]);
 
@@ -506,6 +514,7 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
     if (success) {
       cancelDebouncedSave();
       setLocalMessage('');
+      setSkillsInputValue(''); // Clear skills after send
       clearUploadedAttachments();
       if (isNewSessionMode) await clearDraft();
       if (!isSlashCommand) {
@@ -522,8 +531,10 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
     send,
     localMessage,
     reviewMarkdown,
+    skillsInputValue,
     cancelDebouncedSave,
     setLocalMessage,
+    setSkillsInputValue,
     clearUploadedAttachments,
     isNewSessionMode,
     clearDraft,
@@ -555,14 +566,20 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
     // Allow queueing if there's a message OR review comments, and we have a config
     if ((!localMessage.trim() && !reviewMarkdown) || !executorConfig) return;
 
-    const { prompt } = buildAgentPrompt(localMessage, [reviewMarkdown]);
+    // Prepend skills to message if present
+    const messageWithSkills = skillsInputValue.trim()
+      ? `[Using skill: ${skillsInputValue.trim()}]\n\n${localMessage}`
+      : localMessage;
+    
+    const { prompt } = buildAgentPrompt(messageWithSkills, [reviewMarkdown]);
 
     cancelDebouncedSave();
-    await saveToScratch(localMessage, executorConfig);
+    await saveToScratch(messageWithSkills, executorConfig);
     await queueMessage(prompt, executorConfig);
 
     // Clear local state after queueing (same as handleSend)
     setLocalMessage('');
+    setSkillsInputValue(''); // Clear skills after queue
     clearUploadedAttachments();
     reviewContext?.clearComments();
   }, [
@@ -570,9 +587,11 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
     reviewMarkdown,
     executorConfig,
     queueMessage,
+    skillsInputValue,
     cancelDebouncedSave,
     saveToScratch,
     setLocalMessage,
+    setSkillsInputValue,
     clearUploadedAttachments,
     reviewContext,
   ]);
@@ -1002,6 +1021,12 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
       onOpenWorkspace={
         showOpenWorkspaceButton && workspaceId ? handleOpenWorkspace : undefined
       }
+      skillsInput={{
+        value: skillsInputValue,
+        onChange: setSkillsInputValue,
+        placeholder: 'Type @ for skills...',
+        workspaceId: workspaceId ?? undefined,
+      }}
       onScrollToPreviousMessage={onScrollToPreviousMessage}
       userMessageTurns={userMessageTurns}
       onScrollToUserMessage={onScrollToUserMessage}

@@ -28,6 +28,7 @@ pub mod repo;
 pub mod scratch;
 pub mod search;
 pub mod sessions;
+pub mod skills;
 pub mod ssh_session;
 pub mod tags;
 pub mod terminal;
@@ -70,6 +71,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .with_state(deployment.clone());
 
     let api_routes = Router::new()
+        .merge(skills::router(&deployment))
         .merge(relay_auth::router())
         .merge(host_relay::router(&deployment))
         .merge(relay_signed_routes)
