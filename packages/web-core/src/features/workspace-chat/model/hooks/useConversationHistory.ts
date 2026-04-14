@@ -265,8 +265,8 @@ export const useConversationHistory = ({
     [loadRunningAndEmit]
   );
 
-  // 并发限制：同时最多 20 个 process 加载
-  const MAX_CONCURRENT_LOADS = 20;
+  // FORK-MOD-001: 并发限制 20->3，避免浏览器 WebSocket 排队（限制6个）
+  const MAX_CONCURRENT_LOADS = 3;
 
   // 带并发限制的并行加载工具函数
   const loadProcessesWithLimit = async (

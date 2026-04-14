@@ -122,9 +122,13 @@ pub trait ContainerService {
                 .await?
                 .ok_or(SqlxError::RowNotFound)?;
 
+            // FORK-MOD-001: OPTIMIZATION - Skip ensure_container_exists if container_ref exists
             let container_ref = match workspace.container_ref.as_deref() {
                 Some(container_ref) if !container_ref.is_empty() => container_ref,
-                _ => &self.ensure_container_exists(&workspace).await?,
+                _ => {
+                    tracing::debug!("[discover_executor_options] No container_ref, using ensure_container_exists for workspace {}", workspace.id);
+                    &self.ensure_container_exists(&workspace).await?
+                }
             };
 
             if container_ref.is_empty() {
@@ -831,11 +835,14 @@ pub trait ContainerService {
         &self,
         id: &Uuid,
     ) -> Option<futures::stream::BoxStream<'static, Result<LogMsg, std::io::Error>>> {
+        let id_short = id.to_string();
+        let id_short = &id_short[..8];
+        
         // First try in-memory store (existing behavior)
         if let Some(store) = self.get_msg_store_by_id(id).await {
             Some(
                 store
-                    .history_plus_stream() // BoxStream<Result<LogMsg, io::Error>>
+                    .history_plus_stream()
                     .filter(|msg| future::ready(matches!(msg, Ok(LogMsg::JsonPatch(..)))))
                     .chain(futures::stream::once(async {
                         Ok::<_, std::io::Error>(LogMsg::Finished)
@@ -847,7 +854,6 @@ pub trait ContainerService {
                 execution_process::load_raw_log_messages(&self.db().pool, *id).await?;
 
             // Create temporary store and populate
-            // Include JsonPatch messages (already normalized) and Stdout/Stderr (need normalization)
             let temp_store = Arc::new(MsgStore::new());
             for msg in raw_messages {
                 if matches!(
@@ -892,15 +898,22 @@ pub trait ContainerService {
                     }
                 };
 
-            if let Err(err) = self.ensure_container_exists(&workspace).await {
-                tracing::warn!(
-                    "Failed to recreate worktree before log normalization for workspace {}: {}",
-                    workspace.id,
-                    err
-                );
-            }
-
-            let current_dir = self.workspace_to_current_dir(&workspace);
+            // FORK-MOD-001: OPTIMIZATION - For historical logs, skip ensure_container_exists to avoid
+            // 30s worktree creation delays. normalize_logs only needs the path string.
+            let current_dir = if let Some(ref container_ref) = workspace.container_ref {
+                PathBuf::from(container_ref)
+            } else {
+                // Fallback to legacy behavior only when necessary
+                tracing::debug!("[stream_normalized_logs:{}] No container_ref, using ensure_container_exists", id_short);
+                if let Err(err) = self.ensure_container_exists(&workspace).await {
+                    tracing::warn!(
+                        "Failed to ensure container for workspace {}: {}",
+                        workspace.id,
+                        err
+                    );
+                }
+                self.workspace_to_current_dir(&workspace)
+            };
 
             let executor_action = if let Ok(executor_action) = process.executor_action() {
                 executor_action

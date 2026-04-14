@@ -106,12 +106,11 @@ impl WorktreeManager {
 
         // Check if worktree already exists and is properly set up
         if Self::is_worktree_properly_set_up(repo_path, worktree_path).await? {
-            trace!("Worktree already properly set up at path: {}", path_str);
             return Ok(());
         }
 
         // If worktree doesn't exist or isn't properly set up, recreate it
-        info!("Worktree needs recreation at path: {}", path_str);
+        tracing::debug!("Creating worktree at: {}", path_str);
         Self::recreate_worktree_internal(repo_path, branch_name, worktree_path).await
     }
 
@@ -126,14 +125,15 @@ impl WorktreeManager {
         let worktree_path_owned = worktree_path.to_path_buf();
 
         info!(
-            "Creating worktree {} at path {}",
-            branch_name_owned, path_str
+            "Creating worktree {} at {}",
+            branch_name_owned, 
+            path_str
         );
 
-        // Step 1: Comprehensive cleanup of existing worktree and metadata (non-blocking)
+        // Step 1: Comprehensive cleanup of existing worktree and metadata
         Self::comprehensive_worktree_cleanup_async(repo_path, &worktree_path_owned).await?;
 
-        // Step 2: Ensure parent directory exists (non-blocking)
+        // Step 2: Ensure parent directory exists
         if let Some(parent) = worktree_path_owned.parent() {
             let parent_path = parent.to_path_buf();
             tokio::task::spawn_blocking(move || std::fs::create_dir_all(&parent_path))
@@ -142,7 +142,7 @@ impl WorktreeManager {
                 .map_err(WorktreeError::Io)?;
         }
 
-        // Step 3: Create the worktree with retry logic for metadata conflicts (non-blocking)
+        // Step 3: Create the worktree with retry logic
         Self::create_worktree_with_retry(
             repo_path,
             &branch_name_owned,
@@ -166,16 +166,15 @@ impl WorktreeManager {
                 return Ok(false);
             }
 
-            // Check 2: Worktree must be registered in git metadata using find_worktree
+            // Check 2: Worktree must be registered in git metadata
             let git_service = GitService::new();
             let Some(worktree_name) =
                 Self::find_worktree_git_internal_name(&repo_path, &worktree_path)?
             else {
-                // Directory exists but not registered in git metadata - needs recreation
                 return Ok(false);
             };
 
-            // Try to find the worktree - if it exists and is valid, we're good
+            // Check 3: Validate the worktree
             Ok(git_service.validate_worktree(&repo_path, &worktree_name)?)
         })
         .await
