@@ -125,6 +125,8 @@ impl Opencode {
             .env("NO_COLOR", "1")
             .env("OPENCODE_SERVER_USERNAME", "opencode")
             .env("OPENCODE_SERVER_PASSWORD", &server_password)
+            // Ensure OpenCode can find user config (plugins, etc.) in XDG_CONFIG_HOME
+            .env("XDG_CONFIG_HOME", dirs::config_dir().unwrap_or_else(|| current_dir.join(".config")))
             .args(&args);
 
         env.clone()

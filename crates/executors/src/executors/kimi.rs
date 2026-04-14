@@ -98,22 +98,102 @@ pub struct KimiMessage {
 
 /// Parse Kimi JSON output lines
 fn parse_kimi_line(line: &str) -> Option<ParsedKimiEvent> {
-    // Try to parse as role-based message (assistant/tool)
+    // Try to parse as role-based message (assistant/tool) - legacy format
     if let Ok(msg) = serde_json::from_str::<KimiMessage>(line) {
         return Some(ParsedKimiEvent::Message(msg));
     }
 
-    // Try to parse as status update (text format)
-    if line.starts_with("StatusUpdate(") {
-        // Parse: StatusUpdate(context_usage=0.03, context_tokens=9910, ...)
-        return Some(ParsedKimiEvent::RawLog(line.to_string()));
-    }
-
-    // Try to parse as status update with robust field handling
+    // Try to parse new format (Thought, Message, ToolCall, etc.)
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
+        // Handle Thought {"Thought": {"type": "text", "text": "..."}}
+        if let Some(thought) = value.get("Thought") {
+            if let Some(text) = thought.get("text").and_then(|v| v.as_str()) {
+                return Some(ParsedKimiEvent::Message(KimiMessage {
+                    role: KimiRole::Assistant,
+                    content: KimiContent::Blocks(vec![KimiContentBlock::Think {
+                        think: text.to_string(),
+                        encrypted: None,
+                    }]),
+                    tool_calls: vec![],
+                    tool_call_id: None,
+                }));
+            }
+        }
+
+        // Handle Message {"Message": {"type": "text", "text": "..."}}
+        if let Some(message) = value.get("Message") {
+            if let Some(text) = message.get("text").and_then(|v| v.as_str()) {
+                return Some(ParsedKimiEvent::Message(KimiMessage {
+                    role: KimiRole::Assistant,
+                    content: KimiContent::Blocks(vec![KimiContentBlock::Text {
+                        text: text.to_string(),
+                    }]),
+                    tool_calls: vec![],
+                    tool_call_id: None,
+                }));
+            }
+        }
+
+        // Handle ToolCall {"ToolCall": {...}}
+        if let Some(tool_call) = value.get("ToolCall") {
+            if let (Some(tool_call_id), Some(title)) = (
+                tool_call.get("toolCallId").and_then(|v| v.as_str()),
+                tool_call.get("title").and_then(|v| v.as_str()),
+            ) {
+                // Extract arguments from content if available
+                let arguments = tool_call
+                    .get("content")
+                    .and_then(|c| c.as_array())
+                    .and_then(|arr| arr.get(0))
+                    .and_then(|c| c.get("content"))
+                    .and_then(|c| c.get("text"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+
+                return Some(ParsedKimiEvent::Message(KimiMessage {
+                    role: KimiRole::Assistant,
+                    content: KimiContent::Text(String::new()),
+                    tool_calls: vec![KimiToolCall {
+                        call_type: "function".to_string(),
+                        id: tool_call_id.to_string(),
+                        function: KimiFunctionCall {
+                            name: title.to_string(),
+                            arguments,
+                        },
+                    }],
+                    tool_call_id: None,
+                }));
+            }
+        }
+
+        // Handle Done {"Done": "..."} - treat as turn end
+        if value.get("Done").is_some() {
+            return Some(ParsedKimiEvent::RawLog("TurnEnd".to_string()));
+        }
+
+        // Handle SessionStart {"SessionStart": "..."} - ignore
+        if value.get("SessionStart").is_some() {
+            return None;
+        }
+
+        // Handle User {"User": "..."} - ignore (echo of user input)
+        if value.get("User").is_some() {
+            return None;
+        }
+
+        // Handle Other {"Other": {...}} - log but don't display
+        if value.get("Other").is_some() {
+            return None;
+        }
+
+        // Handle ToolUpdate {"ToolUpdate": {...}} - ignore updates for now
+        if value.get("ToolUpdate").is_some() {
+            return None;
+        }
+
+        // Handle status update with context_usage
         if value.get("context_usage").is_some() {
-            // Use explicit field extraction with defaults for missing fields
-            // instead of ? operator which would silently drop the entire line
             return Some(ParsedKimiEvent::Status(KimiStatusUpdate {
                 context_usage: value["context_usage"].as_f64().unwrap_or(0.0),
                 context_tokens: value["context_tokens"].as_i64().unwrap_or(0),
@@ -122,6 +202,11 @@ fn parse_kimi_line(line: &str) -> Option<ParsedKimiEvent> {
                 plan_mode: value["plan_mode"].as_bool().unwrap_or(false),
             }));
         }
+    }
+
+    // Try to parse as status update (text format)
+    if line.starts_with("StatusUpdate(") {
+        return Some(ParsedKimiEvent::RawLog(line.to_string()));
     }
 
     // Treat as raw output if not recognized
