@@ -13,6 +13,7 @@ use tower_http::validate_request::ValidateRequestHeaderLayer;
 use tracing_subscriber::{EnvFilter, prelude::*};
 use utils::{
     assets::asset_dir,
+    env_config::{load_config, resolve_string},
     port_file::write_port_file_with_proxy,
     sentry::{self as sentry_utils, SentrySource, sentry_layer},
 };
@@ -38,7 +39,9 @@ async fn main() -> Result<(), VibeKanbanError> {
 
     sentry_utils::init_once(SentrySource::Backend);
 
-    let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
+    let cfg = load_config();
+    let log_level = resolve_string(cfg.logging.rust_log.as_deref(), "RUST_LOG")
+        .unwrap_or_else(|| "info".to_string());
     let filter_string = format!(
         "warn,server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level},embedded_ssh={level},desktop_bridge={level},relay_hosts={level},relay_client={level},relay_webrtc={level},codex_core=off",
         level = log_level
@@ -93,26 +96,24 @@ async fn main() -> Result<(), VibeKanbanError> {
     tokio::spawn(async move {
         executors::executors::utils::preload_global_executor_options_cache().await;
     });
-    let port = std::env::var("BACKEND_PORT")
-        .or_else(|_| std::env::var("PORT"))
-        .ok()
+    let port = resolve_string(cfg.server.port.as_deref(), "BACKEND_PORT")
+        .or_else(|| std::env::var("PORT").ok())
         .and_then(|s| {
-            // Remove any ANSI codes, then turn into String
             let cleaned =
                 String::from_utf8(strip(s.as_bytes())).expect("UTF-8 after stripping ANSI");
             cleaned.trim().parse::<u16>().ok()
         })
         .unwrap_or_else(|| {
-            tracing::info!("No PORT environment variable set, using port 0 for auto-assignment");
+            tracing::info!("No port configured, using port 0 for auto-assignment");
             0
-        }); // Use 0 to find free port if no specific port provided
+        });
 
-    let proxy_port = std::env::var("PREVIEW_PROXY_PORT")
-        .ok()
+    let proxy_port = resolve_string(cfg.server.preview_proxy_port.as_deref(), "PREVIEW_PROXY_PORT")
         .and_then(|s| s.trim().parse::<u16>().ok())
         .unwrap_or(0);
 
-    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let host = resolve_string(cfg.server.host.as_deref(), "HOST")
+        .unwrap_or_else(|| "127.0.0.1".to_string());
 
     let main_listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
     let actual_main_port = main_listener.local_addr()?.port();

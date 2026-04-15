@@ -43,6 +43,7 @@ export interface SettingsSectionDefinition {
   id: SettingsSectionType;
   icon: Icon;
   group: SettingsSectionGroup;
+  hiddenInLocalMode?: boolean;
 }
 
 export const SETTINGS_SECTION_DEFINITIONS: SettingsSectionDefinition[] = [
@@ -50,9 +51,9 @@ export const SETTINGS_SECTION_DEFINITIONS: SettingsSectionDefinition[] = [
   { id: 'repos', icon: GitBranchIcon, group: 'host' },
   { id: 'agents', icon: CpuIcon, group: 'host' },
   { id: 'mcp', icon: PlugIcon, group: 'host' },
-  { id: 'organizations', icon: BuildingsIcon, group: 'universal' },
-  { id: 'remote-projects', icon: CloudIcon, group: 'universal' },
-  { id: 'relay', icon: BroadcastIcon, group: 'universal' },
+  { id: 'organizations', icon: BuildingsIcon, group: 'universal', hiddenInLocalMode: true },
+  { id: 'remote-projects', icon: CloudIcon, group: 'universal', hiddenInLocalMode: true },
+  { id: 'relay', icon: BroadcastIcon, group: 'universal', hiddenInLocalMode: true },
 ];
 
 export function isHostSpecificSettingsSection(

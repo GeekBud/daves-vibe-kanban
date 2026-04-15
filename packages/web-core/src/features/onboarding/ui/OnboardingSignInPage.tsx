@@ -76,7 +76,7 @@ export function OnboardingSignInPage() {
   const { t } = useTranslation('common');
   const { theme } = useTheme();
   const posthog = usePostHog();
-  const { config, loginStatus, loading, updateAndSaveConfig } = useUserSystem();
+  const { config, loginStatus, loading, updateAndSaveConfig, localMode } = useUserSystem();
   const setSelectedOrgId = useOrganizationStore((s) => s.setSelectedOrgId);
 
   const [showComparison, setShowComparison] = useState(false);
@@ -289,7 +289,7 @@ export function OnboardingSignInPage() {
             )}
           </header>
 
-          {isAuthMethodsError && !isLoggedIn && (
+          {isAuthMethodsError && !isLoggedIn && !localMode && (
             <div className="rounded-sm border border-error/30 bg-error/10 p-base">
               <p className="text-sm text-high">
                 {authMethodsError instanceof Error
@@ -314,6 +314,21 @@ export function OnboardingSignInPage() {
                   value={saving ? 'Continuing...' : 'Continue'}
                   onClick={() =>
                     void finishOnboarding({ method: 'continue_logged_in' })
+                  }
+                  disabled={saving}
+                />
+              </div>
+            </section>
+          ) : localMode ? (
+            <section className="space-y-base">
+              <p className="text-sm text-normal text-center">
+                Running in local mode. Cloud sign-in is not available.
+              </p>
+              <div className="flex justify-end">
+                <PrimaryButton
+                  value={saving ? 'Continuing...' : 'Continue'}
+                  onClick={() =>
+                    void finishOnboarding({ method: 'skip_sign_in' })
                   }
                   disabled={saving}
                 />

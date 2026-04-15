@@ -21,12 +21,17 @@ pub struct AnalyticsConfig {
 
 impl AnalyticsConfig {
     pub fn new() -> Option<Self> {
-        let api_key = option_env!("POSTHOG_API_KEY")
-            .map(|s| s.to_string())
-            .or_else(|| std::env::var("POSTHOG_API_KEY").ok())?;
-        let api_endpoint = option_env!("POSTHOG_API_ENDPOINT")
-            .map(|s| s.to_string())
-            .or_else(|| std::env::var("POSTHOG_API_ENDPOINT").ok())?;
+        let cfg = utils::env_config::load_config();
+        let api_key = utils::env_config::resolve_string(
+            cfg.telemetry.posthog_api_key.as_deref(),
+            "POSTHOG_API_KEY",
+        )
+        .or_else(|| option_env!("POSTHOG_API_KEY").map(|s| s.to_string()))?;
+        let api_endpoint = utils::env_config::resolve_string(
+            cfg.telemetry.posthog_api_endpoint.as_deref(),
+            "POSTHOG_API_ENDPOINT",
+        )
+        .or_else(|| option_env!("POSTHOG_API_ENDPOINT").map(|s| s.to_string()))?;
 
         Some(Self {
             posthog_api_key: api_key,

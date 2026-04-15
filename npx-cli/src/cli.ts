@@ -5,13 +5,13 @@ import { cac } from "cac";
 import {
   ensureBinary,
   ensureDesktopBundle,
-  BINARY_TAG,
   CACHE_DIR,
   DESKTOP_CACHE_DIR,
   LOCAL_DEV_MODE,
   LOCAL_DIST_DIR,
   R2_BASE_URL,
   getLatestVersion,
+  effectiveTag,
 } from "./download";
 import {
   getTauriPlatform,
@@ -89,9 +89,10 @@ function getBinaryName(base: string): string {
 
 const platformDir = getPlatformDir();
 // In local dev mode, extract directly to dist directory; otherwise use global cache
+const tag = effectiveTag();
 const versionCacheDir = LOCAL_DEV_MODE
   ? path.join(LOCAL_DIST_DIR, platformDir)
-  : path.join(CACHE_DIR, BINARY_TAG, platformDir);
+  : path.join(CACHE_DIR, tag, platformDir);
 
 // Remove old version directories from the binary cache
 function cleanOldVersions(): void {
@@ -100,7 +101,7 @@ function cleanOldVersions(): void {
       withFileTypes: true,
     });
     for (const entry of entries) {
-      if (entry.isDirectory() && entry.name !== BINARY_TAG) {
+      if (entry.isDirectory() && entry.name !== tag) {
         const oldDir = path.join(CACHE_DIR, entry.name);
         fs.rmSync(oldDir, { recursive: true, force: true });
       }
@@ -259,7 +260,7 @@ async function runMain(desktopMode: boolean): Promise<void> {
 
       // Clean old desktop versions after successful download
       if (!LOCAL_DEV_MODE) {
-        cleanOldDesktopVersions(DESKTOP_CACHE_DIR, BINARY_TAG);
+        cleanOldDesktopVersions(DESKTOP_CACHE_DIR, tag);
       }
 
       const exitCode = await installAndLaunch(bundleInfo, platform);

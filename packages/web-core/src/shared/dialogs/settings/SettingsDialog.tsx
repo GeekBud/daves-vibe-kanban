@@ -26,6 +26,7 @@ import {
 } from './settings/SettingsHostContext';
 import { SettingsMachineUserSystemProvider } from './settings/SettingsMachineUserSystemProvider';
 import { ConfirmDialog } from '@vibe/ui/components/ConfirmDialog';
+import { useUserSystem } from '@/shared/hooks/useUserSystem';
 
 export interface SettingsDialogProps {
   initialSection?: SettingsSectionType;
@@ -42,9 +43,11 @@ interface SettingsDialogContentProps {
 function SettingsDialogNavigation({
   activeSection,
   onSectionSelect,
+  localMode,
 }: {
   activeSection: SettingsSectionType;
   onSectionSelect: (sectionId: SettingsSectionType) => void;
+  localMode: boolean;
 }) {
   const { t } = useTranslation('settings');
   const {
@@ -54,10 +57,13 @@ function SettingsDialogNavigation({
     selectedHostId,
     setSelectedHostId,
   } = useSettingsHost();
-  const hostSections = SETTINGS_SECTION_DEFINITIONS.filter(
+  const visibleSections = SETTINGS_SECTION_DEFINITIONS.filter(
+    (section) => !localMode || !section.hiddenInLocalMode
+  );
+  const hostSections = visibleSections.filter(
     (section) => section.group === 'host'
   );
-  const universalSections = SETTINGS_SECTION_DEFINITIONS.filter(
+  const universalSections = visibleSections.filter(
     (section) => section.group === 'universal'
   );
   const hostOptions = availableHosts.map((host) => ({
@@ -72,7 +78,9 @@ function SettingsDialogNavigation({
       : t('settings.hostPicker.selectMachineHint');
 
   const handlePairOtherMachines = () => {
-    onSectionSelect('relay');
+    if (!localMode) {
+      onSectionSelect('relay');
+    }
   };
 
   const renderSectionButton = (sectionId: SettingsSectionType) => {
@@ -120,13 +128,17 @@ function SettingsDialogNavigation({
           <SettingsSelect
             value={selectedHostId ?? undefined}
             options={hostOptions}
-            actions={[
-              {
-                label: t('settings.layout.nav.pairOtherMachines'),
-                icon: PlusIcon,
-                onClick: handlePairOtherMachines,
-              },
-            ]}
+            actions={
+              localMode
+                ? []
+                : [
+                    {
+                      label: t('settings.layout.nav.pairOtherMachines'),
+                      icon: PlusIcon,
+                      onClick: handlePairOtherMachines,
+                    },
+                  ]
+            }
             onChange={setSelectedHostId}
             placeholder={t('settings.layout.nav.selectHost')}
           />
@@ -160,23 +172,26 @@ function SettingsDialogContent({
   const { t } = useTranslation('settings');
   const { isDirty } = useSettingsDirty();
   const { availableHosts, hostsResolved, selectedHost } = useSettingsHost();
+  const { localMode } = useUserSystem();
+
+  const visibleSections = useMemo(
+    () =>
+      SETTINGS_SECTION_DEFINITIONS.filter(
+        (section) => !localMode || !section.hiddenInLocalMode
+      ),
+    [localMode]
+  );
 
   const resolvedInitialSection = useMemo<SettingsSectionType>(() => {
     if (
       initialSection &&
-      SETTINGS_SECTION_DEFINITIONS.some(
-        (section) => section.id === initialSection
-      )
+      visibleSections.some((section) => section.id === initialSection)
     ) {
       return initialSection;
     }
 
-    if (hostsResolved && availableHosts.length === 0) {
-      return 'organizations';
-    }
-
     return 'general';
-  }, [availableHosts.length, hostsResolved, initialSection]);
+  }, [visibleSections, initialSection]);
 
   const [activeSection, setActiveSection] = useState<SettingsSectionType>(
     resolvedInitialSection
@@ -222,7 +237,7 @@ function SettingsDialogContent({
       isHostSpecificSettingsSection(activeSection) &&
       availableHosts.length === 0
     ) {
-      setActiveSection('organizations');
+      setActiveSection('general');
     }
   }, [activeSection, availableHosts.length, hostsResolved]);
 
@@ -298,6 +313,7 @@ function SettingsDialogContent({
             <SettingsDialogNavigation
               activeSection={activeSection}
               onSectionSelect={handleSectionSelect}
+              localMode={localMode}
             />
           </div>
           {/* Content - hidden on mobile when showing nav */}

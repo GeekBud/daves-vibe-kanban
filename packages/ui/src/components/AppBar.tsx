@@ -60,6 +60,7 @@ interface AppBarProps {
   isExportActive?: boolean;
   activeProjectId: string | null;
   isSignedIn?: boolean;
+  isLocalMode?: boolean;
   isLoadingProjects?: boolean;
   onSignIn?: () => void;
   onHoverStart?: () => void;
@@ -212,6 +213,7 @@ export function AppBar({
   isExportActive = false,
   activeProjectId,
   isSignedIn,
+  isLocalMode,
   isLoadingProjects,
   onSignIn,
   onHoverStart,
@@ -246,7 +248,7 @@ export function AppBar({
     });
   }
 
-  if (hosts.length > 0 || onPairHostClick) {
+  if (!isLocalMode && (hosts.length > 0 || onPairHostClick)) {
     sections.push({
       key: 'remote',
       label: 'Remote',
@@ -283,7 +285,7 @@ export function AppBar({
 
   const projectSectionItems: AppBarSectionItem[] = [];
 
-  if (!isSignedIn) {
+  if (!isSignedIn && !isLocalMode) {
     projectSectionItems.push({
       key: 'kanban-cta',
       kind: 'kanban-cta',

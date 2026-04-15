@@ -5,6 +5,7 @@ use directories::ProjectDirs;
 pub mod approvals;
 pub mod assets;
 pub mod browser;
+pub mod env_config;
 pub mod command_ext;
 pub mod diff;
 pub mod execution_logs;
@@ -49,18 +50,24 @@ pub fn is_wsl2() -> bool {
 }
 
 pub fn cache_dir() -> std::path::PathBuf {
-    let proj = if cfg!(debug_assertions) {
-        ProjectDirs::from("ai", "bloop-dev", env!("CARGO_PKG_NAME"))
-            .expect("OS didn't give us a home directory")
-    } else {
-        ProjectDirs::from("ai", "bloop", env!("CARGO_PKG_NAME"))
-            .expect("OS didn't give us a home directory")
-    };
+    // 1. Read from daves_env_config.json
+    let cfg = crate::env_config::load_config();
+    if let Some(dir) = &cfg.paths.cache_dir {
+        let path = std::path::PathBuf::from(dir);
+        if !path.exists() {
+            std::fs::create_dir_all(&path).expect("Failed to create cache directory");
+        }
+        return path;
+    }
 
-    // ✔ macOS → ~/Library/Caches/MyApp
-    // ✔ Linux → ~/.cache/myapp (respects XDG_CACHE_HOME)
-    // ✔ Windows → %LOCALAPPDATA%\Example\MyApp
-    proj.cache_dir().to_path_buf()
+    // 2. Legacy fallback for debug builds
+    if cfg!(debug_assertions) {
+        let proj = ProjectDirs::from("ai", "bloop-dev", env!("CARGO_PKG_NAME"))
+            .expect("OS didn't give us a home directory");
+        proj.cache_dir().to_path_buf()
+    } else {
+        std::path::PathBuf::from("/Users/lianghusile/dave/appData/daves-vibe-kanban/cache")
+    }
 }
 
 // Get or create cached PowerShell script file

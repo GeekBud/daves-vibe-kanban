@@ -36,7 +36,7 @@ const OAuthDialogImpl = create<OAuthDialogProps>(({ initialProvider }) => {
   const modal = useModal();
   const { t } = useTranslation('common');
   const queryClient = useQueryClient();
-  const { reloadSystem } = useUserSystem();
+  const { reloadSystem, localMode } = useUserSystem();
   const [state, setState] = useState<OAuthState>({ type: 'select' });
   const popupRef = useRef<Window | null>(null);
   const autoStartedRef = useRef(false);
@@ -257,79 +257,89 @@ const OAuthDialogImpl = create<OAuthDialogProps>(({ initialProvider }) => {
             </DialogHeader>
 
             <div className="space-y-3 py-4">
-              {isAuthMethodsError && (
-                <Alert variant="destructive">
+              {localMode ? (
+                <Alert>
                   <AlertDescription>
-                    {authMethodsError instanceof Error
-                      ? authMethodsError.message
-                      : 'Failed to load available sign-in methods.'}
+                    Running in local mode. Cloud sign-in is not available.
                   </AlertDescription>
                 </Alert>
-              )}
-              {isAuthMethodsError && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => void refetchAuthMethods()}
-                >
-                  Retry
-                </Button>
-              )}
-              {!isAuthMethodsError && hasLocalAuth && (
+              ) : (
                 <>
-                  <Input
-                    id="local-auth-email"
-                    type="email"
-                    value={localEmail}
-                    onChange={(event) => setLocalEmail(event.target.value)}
-                    placeholder="Email"
-                    autoComplete="username"
-                  />
-                  <Input
-                    id="local-auth-password"
-                    type="password"
-                    value={localPassword}
-                    onChange={(event) => setLocalPassword(event.target.value)}
-                    placeholder="Password"
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    className="relative flex h-10 w-full items-center overflow-hidden rounded-[4px] border border-[#dadce0] bg-[#f2f2f2] px-3 text-[14px] font-medium leading-5 tracking-[0.25px] text-[#1f1f1f] transition-colors duration-150 hover:bg-[#e8eaed] active:bg-[#e2e3e5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a73e8]/40 disabled:cursor-not-allowed disabled:bg-[#ffffff61] disabled:text-[#1f1f1f]/40"
-                    onClick={() => void handleLocalLogin()}
-                    disabled={
-                      isSubmittingLocal || !localEmail.trim() || !localPassword
-                    }
-                    style={{ fontFamily: "'Roboto', Arial, sans-serif" }}
-                  >
-                    <span className="w-full text-center">
-                      {isSubmittingLocal
-                        ? 'Signing in...'
-                        : 'Sign in with email'}
-                    </span>
-                  </button>
+                  {isAuthMethodsError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>
+                        {authMethodsError instanceof Error
+                          ? authMethodsError.message
+                          : 'Failed to load available sign-in methods.'}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {isAuthMethodsError && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => void refetchAuthMethods()}
+                    >
+                      Retry
+                    </Button>
+                  )}
+                  {!isAuthMethodsError && hasLocalAuth && (
+                    <>
+                      <Input
+                        id="local-auth-email"
+                        type="email"
+                        value={localEmail}
+                        onChange={(event) => setLocalEmail(event.target.value)}
+                        placeholder="Email"
+                        autoComplete="username"
+                      />
+                      <Input
+                        id="local-auth-password"
+                        type="password"
+                        value={localPassword}
+                        onChange={(event) => setLocalPassword(event.target.value)}
+                        placeholder="Password"
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="relative flex h-10 w-full items-center overflow-hidden rounded-[4px] border border-[#dadce0] bg-[#f2f2f2] px-3 text-[14px] font-medium leading-5 tracking-[0.25px] text-[#1f1f1f] transition-colors duration-150 hover:bg-[#e8eaed] active:bg-[#e2e3e5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a73e8]/40 disabled:cursor-not-allowed disabled:bg-[#ffffff61] disabled:text-[#1f1f1f]/40"
+                        onClick={() => void handleLocalLogin()}
+                        disabled={
+                          isSubmittingLocal || !localEmail.trim() || !localPassword
+                        }
+                        style={{ fontFamily: "'Roboto', Arial, sans-serif" }}
+                      >
+                        <span className="w-full text-center">
+                          {isSubmittingLocal
+                            ? 'Signing in...'
+                            : 'Sign in with email'}
+                        </span>
+                      </button>
+                    </>
+                  )}
+                  {!isAuthMethodsError &&
+                    hasOAuthProviders &&
+                    oauthProviders.includes('github') && (
+                      <OAuthSignInButton
+                        provider="github"
+                        className="w-full"
+                        onClick={() => handleProviderSelect('github')}
+                        disabled={isSubmittingLocal}
+                      />
+                    )}
+                  {!isAuthMethodsError &&
+                    hasOAuthProviders &&
+                    oauthProviders.includes('google') && (
+                      <OAuthSignInButton
+                        provider="google"
+                        className="w-full"
+                        onClick={() => handleProviderSelect('google')}
+                        disabled={isSubmittingLocal}
+                      />
+                    )}
                 </>
               )}
-              {!isAuthMethodsError &&
-                hasOAuthProviders &&
-                oauthProviders.includes('github') && (
-                  <OAuthSignInButton
-                    provider="github"
-                    className="w-full"
-                    onClick={() => handleProviderSelect('github')}
-                    disabled={isSubmittingLocal}
-                  />
-                )}
-              {!isAuthMethodsError &&
-                hasOAuthProviders &&
-                oauthProviders.includes('google') && (
-                  <OAuthSignInButton
-                    provider="google"
-                    className="w-full"
-                    onClick={() => handleProviderSelect('google')}
-                    disabled={isSubmittingLocal}
-                  />
-                )}
             </div>
 
             <DialogFooter>

@@ -24,6 +24,7 @@ export interface AppBarUserOrganization {
 
 interface AppBarUserPopoverProps {
   isSignedIn: boolean;
+  isLocalMode?: boolean;
   avatarUrl: string | null;
   avatarError: boolean;
   organizations: AppBarUserOrganization[];
@@ -40,6 +41,7 @@ interface AppBarUserPopoverProps {
 
 export function AppBarUserPopover({
   isSignedIn,
+  isLocalMode,
   avatarUrl,
   avatarError,
   organizations,
@@ -71,18 +73,20 @@ export function AppBarUserPopover({
               'hover:bg-panel/70',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand'
             )}
-            aria-label="Sign in"
+            aria-label={isLocalMode ? 'Settings' : 'Sign in'}
           >
             <UserIcon className="size-icon-sm" weight="bold" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="end" className="min-w-[200px]">
-          <DropdownMenuItem icon={SignInIcon} onClick={onSignIn}>
-            {t('signIn')}
-          </DropdownMenuItem>
+          {!isLocalMode && (
+            <DropdownMenuItem icon={SignInIcon} onClick={onSignIn}>
+              {t('signIn')}
+            </DropdownMenuItem>
+          )}
           {onSettings && (
             <>
-              <DropdownMenuSeparator />
+              {!isLocalMode && <DropdownMenuSeparator />}
               <DropdownMenuItem icon={GearIcon} onClick={onSettings}>
                 {settingsLabel}
               </DropdownMenuItem>

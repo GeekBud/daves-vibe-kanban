@@ -10,7 +10,7 @@ interface LocalAuthProviderProps {
 }
 
 export function LocalAuthProvider({ children }: LocalAuthProviderProps) {
-  const { loginStatus } = useUserSystem();
+  const { loginStatus, localMode } = useUserSystem();
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -20,8 +20,9 @@ export function LocalAuthProvider({ children }: LocalAuthProviderProps) {
         loginStatus?.status === 'loggedin'
           ? (loginStatus.profile?.user_id ?? null)
           : null,
+      isLocalMode: localMode,
     }),
-    [loginStatus]
+    [loginStatus, localMode]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

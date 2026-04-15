@@ -9,6 +9,23 @@ export const R2_BASE_URL = '__R2_PUBLIC_URL__';
 export const BINARY_TAG = '__BINARY_TAG__'; // e.g., v0.0.135-20251215122030
 export const CACHE_DIR = path.join(os.homedir(), '.vibe-kanban', 'bin');
 
+// GitHub Releases fallback for when R2 CDN is unavailable
+const GITHUB_REPO = 'GeekBud/daves-vibe-kanban';
+const GITHUB_RELEASES_BASE_URL = `https://github.com/${GITHUB_REPO}/releases/download`;
+const PACKAGE_VERSION = require('../package.json').version as string;
+
+function isPlaceholder(value: string): boolean {
+  return value.startsWith('__') && value.endsWith('__');
+}
+
+export function effectiveTag(): string {
+  return isPlaceholder(BINARY_TAG) ? `v${PACKAGE_VERSION}` : BINARY_TAG;
+}
+
+function r2UrlAvailable(): boolean {
+  return !isPlaceholder(R2_BASE_URL);
+}
+
 // Local development mode: use binaries from npx-cli/dist/ instead of R2
 // Only activate if dist/ exists (i.e., running from source after local-build.sh)
 export const LOCAL_DIST_DIR = path.join(__dirname, '..', 'dist');
@@ -169,30 +186,59 @@ export async function ensureBinary(
     }
     throw new Error(
       `Local binary not found: ${localZipPath}\n` +
-        `Run ./local-build.sh first to build the binaries.`
+        `Run ./local-build.sh first to build the binaries, or set VIBE_KANBAN_LOCAL=1.`
     );
   }
 
-  const cacheDir = path.join(CACHE_DIR, BINARY_TAG, platform);
+  const tag = effectiveTag();
+  const cacheDir = path.join(CACHE_DIR, tag, platform);
   const zipPath = path.join(cacheDir, `${binaryName}.zip`);
 
   if (fs.existsSync(zipPath)) return zipPath;
 
   fs.mkdirSync(cacheDir, { recursive: true });
 
-  const manifest = await fetchJson<BinaryManifest>(
-    `${R2_BASE_URL}/binaries/${BINARY_TAG}/manifest.json`
-  );
-  const binaryInfo = manifest.platforms?.[platform]?.[binaryName];
+  let binaryInfo: BinaryInfo | undefined;
+  let url: string | undefined;
 
-  if (!binaryInfo) {
+  if (r2UrlAvailable()) {
+    try {
+      const manifest = await fetchJson<BinaryManifest>(
+        `${R2_BASE_URL}/binaries/${BINARY_TAG}/manifest.json`
+      );
+      binaryInfo = manifest.platforms?.[platform]?.[binaryName];
+      if (binaryInfo) {
+        url = `${R2_BASE_URL}/binaries/${BINARY_TAG}/${platform}/${binaryName}.zip`;
+      }
+    } catch {
+      // R2 failed, will try fallback
+    }
+  }
+
+  if (!url) {
+    // Fallback to GitHub Releases
+    url = `${GITHUB_RELEASES_BASE_URL}/${tag}/${binaryName}-${platform}.zip`;
+    // GitHub Releases may not have a manifest with SHA256, so we skip checksum validation
+    binaryInfo = undefined;
+  }
+
+  if (!url) {
     throw new Error(
-      `Binary ${binaryName} not available for ${platform}`
+      `Binary ${binaryName} not available for ${platform}. ` +
+      `No R2 CDN configured and no GitHub Release fallback available. ` +
+      `Try setting VIBE_KANBAN_LOCAL=1 and building from source.`
     );
   }
 
-  const url = `${R2_BASE_URL}/binaries/${BINARY_TAG}/${platform}/${binaryName}.zip`;
-  await downloadFile(url, zipPath, binaryInfo.sha256, onProgress);
+  try {
+    await downloadFile(url, zipPath, binaryInfo?.sha256, onProgress);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to download ${binaryName} for ${platform}: ${msg}\n` +
+      `If you are building from source, run ./local-build.sh and set VIBE_KANBAN_LOCAL=1.`
+    );
+  }
 
   return zipPath;
 }
@@ -223,13 +269,14 @@ export async function ensureDesktopBundle(
     }
     throw new Error(
       `Local desktop bundle not found: ${localDir}\n` +
-        `Run './local-build.sh --desktop' first to build the Tauri app.`
+        `Run './local-build.sh --desktop' first to build the Tauri app, or set VIBE_KANBAN_LOCAL=1.`
     );
   }
 
+  const tag = effectiveTag();
   const cacheDir = path.join(
     DESKTOP_CACHE_DIR,
-    BINARY_TAG,
+    tag,
     tauriPlatform
   );
 
@@ -241,14 +288,58 @@ export async function ensureDesktopBundle(
 
   fs.mkdirSync(cacheDir, { recursive: true });
 
-  // Fetch the desktop manifest
-  const manifest = await fetchJson<DesktopManifest>(
-    `${R2_BASE_URL}/binaries/${BINARY_TAG}/tauri/desktop-manifest.json`
-  );
-  const platformInfo = manifest.platforms?.[tauriPlatform];
-  if (!platformInfo) {
+  let platformInfo: DesktopPlatformInfo | undefined;
+  let url: string | undefined;
+
+  if (r2UrlAvailable()) {
+    try {
+      const manifest = await fetchJson<DesktopManifest>(
+        `${R2_BASE_URL}/binaries/${BINARY_TAG}/tauri/desktop-manifest.json`
+      );
+      platformInfo = manifest.platforms?.[tauriPlatform];
+      if (platformInfo) {
+        url = `${R2_BASE_URL}/binaries/${BINARY_TAG}/tauri/${tauriPlatform}/${platformInfo.file}`;
+      }
+    } catch {
+      // R2 failed, will try fallback
+    }
+  }
+
+  if (!url) {
+    // Fallback: try common GitHub Release naming conventions for Tauri bundles
+    const candidates = [
+      `vibe-kanban_${tag}_${tauriPlatform}.tar.gz`,
+      `vibe-kanban_${tag}_${tauriPlatform}.dmg`,
+      `vibe-kanban_${tag}_${tauriPlatform}-setup.exe`,
+      `vibe-kanban_${tauriPlatform}.tar.gz`,
+      `vibe-kanban_${tauriPlatform}.dmg`,
+      `vibe-kanban_${tauriPlatform}-setup.exe`,
+    ];
+    for (const file of candidates) {
+      const testUrl = `${GITHUB_RELEASES_BASE_URL}/${tag}/${file}`;
+      try {
+        // HEAD request to check existence
+        const exists = await new Promise<boolean>((resolve) => {
+          https.request(testUrl, { method: 'HEAD' }, (res) => {
+            resolve(res.statusCode === 200);
+          }).on('error', () => resolve(false)).end();
+        });
+        if (exists) {
+          url = testUrl;
+          platformInfo = { file, sha256: '', type: null };
+          break;
+        }
+      } catch {
+        // continue to next candidate
+      }
+    }
+  }
+
+  if (!url || !platformInfo) {
     throw new Error(
-      `Desktop app not available for platform: ${tauriPlatform}`
+      `Desktop app not available for platform: ${tauriPlatform}. ` +
+      `No R2 CDN configured and no GitHub Release fallback found. ` +
+      `Try setting VIBE_KANBAN_LOCAL=1 and building from source.`
     );
   }
 
@@ -256,8 +347,15 @@ export async function ensureDesktopBundle(
 
   // Skip download if file already exists (e.g. previous failed install)
   if (!fs.existsSync(destPath)) {
-    const url = `${R2_BASE_URL}/binaries/${BINARY_TAG}/tauri/${tauriPlatform}/${platformInfo.file}`;
-    await downloadFile(url, destPath, platformInfo.sha256, onProgress);
+    try {
+      await downloadFile(url, destPath, platformInfo.sha256 || undefined, onProgress);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Failed to download desktop bundle for ${tauriPlatform}: ${msg}\n` +
+        `If you are building from source, run './local-build.sh --desktop' and set VIBE_KANBAN_LOCAL=1.`
+      );
+    }
   }
 
   return {
@@ -268,8 +366,19 @@ export async function ensureDesktopBundle(
 }
 
 export async function getLatestVersion(): Promise<string | undefined> {
-  const manifest = await fetchJson<BinaryManifest>(
-    `${R2_BASE_URL}/binaries/manifest.json`
-  );
-  return manifest.latest;
+  if (r2UrlAvailable()) {
+    try {
+      const manifest = await fetchJson<BinaryManifest>(
+        `${R2_BASE_URL}/binaries/manifest.json`
+      );
+      if (manifest.latest) {
+        return manifest.latest;
+      }
+    } catch {
+      // R2 failed, try fallback
+    }
+  }
+
+  // Fallback: use package.json version
+  return `v${PACKAGE_VERSION}`;
 }

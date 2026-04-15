@@ -120,7 +120,7 @@ const SOCIAL_LINKS = [
   },
   {
     label: 'Docs',
-    href: 'https://www.vibekanban.com/docs',
+    href: 'https://github.com/GeekBud/daves-vibe-kanban#readme',
     icon: BookOpenIcon,
   },
 ];
@@ -362,7 +362,7 @@ export function LandingPage() {
                 <code>--yolo</code> by default. Always review what agents are
                 doing.{' '}
                 <a
-                  href="https://www.vibekanban.com/docs/getting-started#safety-notice"
+                  href="https://github.com/GeekBud/daves-vibe-kanban#readme/getting-started#safety-notice"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-brand hover:underline"
@@ -552,7 +552,7 @@ export function LandingPage() {
           <p className="text-xs text-low">
             By continuing you agree to the{' '}
             <a
-              href="https://www.vibekanban.com/terms"
+              href="https://github.com/GeekBud/daves-vibe-kanban#readme"
               target="_blank"
               rel="noopener noreferrer"
               className="text-brand hover:underline"
@@ -561,7 +561,7 @@ export function LandingPage() {
             </a>{' '}
             and{' '}
             <a
-              href="https://www.vibekanban.com/privacy"
+              href="https://github.com/GeekBud/daves-vibe-kanban#readme"
               target="_blank"
               rel="noopener noreferrer"
               className="text-brand hover:underline"

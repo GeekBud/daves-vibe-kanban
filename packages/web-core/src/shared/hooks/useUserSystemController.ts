@@ -44,6 +44,7 @@ export function useUserSystemController({
   const machineId = userSystemInfo?.machine_id || null;
   const loginStatus = userSystemInfo?.login_status || null;
   const remoteAuthDegraded = userSystemInfo?.remote_auth_degraded || null;
+  const localMode = userSystemInfo?.local_mode ?? false;
   const profiles =
     (userSystemInfo?.executors as Record<string, ExecutorProfile> | null) ||
     null;
@@ -153,6 +154,7 @@ export function useUserSystemController({
         machineId,
         loginStatus,
         remoteAuthDegraded,
+        localMode,
       },
       appVersion,
       previewProxyPort,
@@ -163,6 +165,7 @@ export function useUserSystemController({
       machineId,
       loginStatus,
       remoteAuthDegraded,
+      localMode,
       updateConfig,
       saveConfig,
       updateAndSaveConfig,
@@ -182,6 +185,7 @@ export function useUserSystemController({
       previewProxyPort,
       loginStatus,
       remoteAuthDegraded,
+      localMode,
       profiles,
       reloadSystem,
       saveConfig,

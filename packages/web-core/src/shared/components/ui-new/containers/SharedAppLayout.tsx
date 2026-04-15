@@ -64,7 +64,7 @@ export function SharedAppLayout() {
   const isLeftSidebarVisible = useUiPreferencesStore(
     (s) => s.isLeftSidebarVisible
   );
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLocalMode } = useAuth();
   const { appVersion } = useUserSystem();
   const updateVersion = useAppUpdateStore((s) => s.updateVersion);
   const restartForUpdate = useAppUpdateStore((s) => s.restart);
@@ -346,6 +346,7 @@ export function SharedAppLayout() {
               isExportActive={isExportActive}
               activeProjectId={activeProjectId}
               isSignedIn={isSignedIn}
+              isLocalMode={isLocalMode}
               isLoadingProjects={isLoading}
               onSignIn={handleSignIn}
               onHoverStart={() => setIsAppBarHovered(true)}

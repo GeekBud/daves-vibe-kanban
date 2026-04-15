@@ -115,7 +115,9 @@ fn main() {
         .install_default()
         .expect("Failed to install rustls crypto provider");
 
-    let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
+    let cfg = utils::env_config::load_config();
+    let log_level = utils::env_config::resolve_string(cfg.logging.rust_log.as_deref(), "RUST_LOG")
+        .unwrap_or_else(|| "info".to_string());
     let filter_string = format!(
         "warn,server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level},vibe_kanban_tauri={level}",
         level = log_level
@@ -177,8 +179,11 @@ fn main() {
                 // Dev mode: frontend dev server (Vite) and backend are started
                 // externally. Use WebviewUrl::External so that macOS WKWebView
                 // renders with the same content scaling as the production build.
-                let frontend_port =
-                    std::env::var("FRONTEND_PORT").unwrap_or_else(|_| "3000".to_string());
+                let frontend_port = utils::env_config::resolve_string(
+                    cfg.frontend.frontend_port.as_deref(),
+                    "FRONTEND_PORT",
+                )
+                .unwrap_or_else(|| "3000".to_string());
                 let dev_url = format!("http://localhost:{frontend_port}");
                 tracing::info!("Running in dev mode — using external frontend/backend servers (devUrl={dev_url})");
                 let window = create_window(

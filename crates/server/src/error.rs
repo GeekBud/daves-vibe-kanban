@@ -83,6 +83,8 @@ pub enum ApiError {
     PayloadTooLarge,
     #[error("Bad gateway: {0}")]
     BadGateway(String),
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
     #[error(transparent)]
     CommandBuilder(#[from] CommandBuildError),
     #[error(transparent)]
@@ -99,13 +101,13 @@ impl From<&'static str> for ApiError {
 
 impl From<RemoteClientNotConfigured> for ApiError {
     fn from(_: RemoteClientNotConfigured) -> Self {
-        ApiError::BadRequest("Remote client not configured".to_string())
+        ApiError::ServiceUnavailable("Remote client not configured".to_string())
     }
 }
 
 impl From<RelayHostsNotConfigured> for ApiError {
     fn from(_: RelayHostsNotConfigured) -> Self {
-        ApiError::BadRequest("Remote relay API is not configured".to_string())
+        ApiError::ServiceUnavailable("Remote relay API is not configured".to_string())
     }
 }
 
@@ -477,6 +479,11 @@ impl IntoResponse for ApiError {
             ApiError::BadGateway(msg) => {
                 ErrorInfo::with_status(StatusCode::BAD_GATEWAY, "BadGateway", msg.clone())
             }
+            ApiError::ServiceUnavailable(msg) => ErrorInfo::with_status(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "ServiceUnavailable",
+                msg.clone(),
+            ),
             ApiError::Multipart(_) => ErrorInfo::bad_request(
                 "MultipartError",
                 "Failed to upload file. Please ensure the file is valid and try again.",

@@ -1,10 +1,7 @@
-use directories::ProjectDirs;
 use rust_embed::RustEmbed;
 
-const PROJECT_ROOT: &str = env!("CARGO_MANIFEST_DIR");
-
 pub fn asset_dir() -> std::path::PathBuf {
-    // Allow override via VK_ASSET_DIR (e.g. to reuse official app data in dev)
+    // 1. Allow override via VK_ASSET_DIR (legacy env var)
     if let Ok(dir) = std::env::var("VK_ASSET_DIR") {
         let path = std::path::PathBuf::from(dir);
         if !path.exists() {
@@ -13,10 +10,12 @@ pub fn asset_dir() -> std::path::PathBuf {
         return path;
     }
 
-    let path = if cfg!(debug_assertions) {
-        std::path::PathBuf::from(PROJECT_ROOT).join("../../dev_assets")
+    // 2. Read from daves_env_config.json
+    let cfg = crate::env_config::load_config();
+    let path = if let Some(dir) = &cfg.paths.asset_dir {
+        std::path::PathBuf::from(dir)
     } else {
-        prod_asset_dir_path()
+        std::path::PathBuf::from("/Users/lianghusile/dave/appData/daves-vibe-kanban")
     };
 
     // Ensure the directory exists
@@ -25,16 +24,10 @@ pub fn asset_dir() -> std::path::PathBuf {
     }
 
     path
-    // ✔ macOS → ~/Library/Application Support/MyApp
-    // ✔ Linux → ~/.local/share/myapp   (respects XDG_DATA_HOME)
-    // ✔ Windows → %APPDATA%\Example\MyApp
 }
 
 pub fn prod_asset_dir_path() -> std::path::PathBuf {
-    ProjectDirs::from("ai", "bloop", "vibe-kanban")
-        .expect("OS didn't give us a home directory")
-        .data_dir()
-        .to_path_buf()
+    std::path::PathBuf::from("/Users/lianghusile/dave/appData/daves-vibe-kanban")
 }
 
 pub fn config_path() -> std::path::PathBuf {

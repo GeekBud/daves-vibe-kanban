@@ -5,6 +5,7 @@ export interface AuthContextValue {
   isSignedIn: boolean;
   isLoaded: boolean;
   userId: string | null;
+  isLocalMode: boolean;
 }
 
 export const AuthContext = createHmrContext<AuthContextValue | undefined>(

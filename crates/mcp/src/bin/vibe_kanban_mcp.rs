@@ -98,6 +98,8 @@ where
 }
 
 async fn resolve_base_url(log_prefix: &str) -> anyhow::Result<String> {
+    let cfg = utils::env_config::load_config();
+
     if let Ok(url) = std::env::var("VIBE_BACKEND_URL") {
         tracing::info!(
             "[{}] Using backend URL from VIBE_BACKEND_URL: {}",
@@ -107,21 +109,21 @@ async fn resolve_base_url(log_prefix: &str) -> anyhow::Result<String> {
         return Ok(url);
     }
 
-    let host = std::env::var(HOST_ENV)
-        .or_else(|_| std::env::var("HOST"))
-        .unwrap_or_else(|_| "127.0.0.1".to_string());
+    let host = utils::env_config::resolve_string(cfg.server.host.as_deref(), HOST_ENV)
+        .or_else(|| std::env::var("HOST").ok())
+        .unwrap_or_else(|| "127.0.0.1".to_string());
 
-    let port = match std::env::var(PORT_ENV)
-        .or_else(|_| std::env::var("BACKEND_PORT"))
-        .or_else(|_| std::env::var("PORT"))
+    let port = match utils::env_config::resolve_string(cfg.server.port.as_deref(), PORT_ENV)
+        .or_else(|| std::env::var("BACKEND_PORT").ok())
+        .or_else(|| std::env::var("PORT").ok())
     {
-        Ok(port_str) => {
+        Some(port_str) => {
             tracing::info!("[{}] Using port from environment: {}", log_prefix, port_str);
             port_str
                 .parse::<u16>()
                 .map_err(|error| anyhow::anyhow!("Invalid port value '{}': {}", port_str, error))?
         }
-        Err(_) => {
+        None => {
             let port = read_port_file("vibe-kanban").await?;
             tracing::info!("[{}] Using port from port file: {}", log_prefix, port);
             port

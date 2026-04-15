@@ -274,9 +274,12 @@ impl LocalContainerService {
     }
 
     async fn cleanup_expired_workspaces(&self) -> Result<(), DeploymentError> {
-        if std::env::var("DISABLE_WORKTREE_CLEANUP").is_ok() {
+        let cfg = utils::env_config::load_config();
+        let disabled = cfg.features.disable_worktree_cleanup.unwrap_or(false)
+            || std::env::var("DISABLE_WORKTREE_CLEANUP").is_ok();
+        if disabled {
             tracing::info!(
-                "Expired workspace cleanup is disabled via DISABLE_WORKTREE_CLEANUP environment variable"
+                "Expired workspace cleanup is disabled via daves_env_config.json or DISABLE_WORKTREE_CLEANUP environment variable"
             );
             return Ok(());
         }

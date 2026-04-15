@@ -139,15 +139,18 @@ fn default_port(https: bool) -> u16 {
 fn allowed_origins() -> &'static Vec<OriginKey> {
     static ALLOWED: OnceLock<Vec<OriginKey>> = OnceLock::new();
     ALLOWED.get_or_init(|| {
-        let value = match std::env::var("VK_ALLOWED_ORIGINS") {
-            Ok(value) => value,
-            Err(_) => return Vec::new(),
-        };
+        let value = utils::env_config::resolve_string(
+            utils::env_config::load_config().server.allowed_origins.as_deref(),
+            "VK_ALLOWED_ORIGINS",
+        );
 
-        value
-            .split(',')
-            .filter_map(|origin| OriginKey::from_origin(origin.trim()))
-            .collect()
+        match value {
+            Some(value) => value
+                .split(',')
+                .filter_map(|origin| OriginKey::from_origin(origin.trim()))
+                .collect(),
+            None => Vec::new(),
+        }
     })
 }
 

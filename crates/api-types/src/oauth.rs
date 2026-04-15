@@ -91,4 +91,6 @@ pub struct StatusResponse {
     pub profile: Option<ProfileResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub degraded: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_mode: Option<bool>,
 }
