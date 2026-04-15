@@ -38,6 +38,8 @@ pub enum KimiRole {
     User,
     Tool,
     System,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +53,8 @@ pub enum KimiContentBlock {
     Text {
         text: String,
     },
+    #[serde(other)]
+    Unknown,
 }
 
 /// Kimi tool call structure
@@ -103,8 +107,90 @@ fn parse_kimi_line(line: &str) -> Option<ParsedKimiEvent> {
         return Some(ParsedKimiEvent::Message(msg));
     }
 
-    // Try to parse new format (Thought, Message, ToolCall, etc.)
+    // Best-effort fallback for role-based messages that fail strict KimiMessage
+    // parsing (e.g. due to unknown content block types or new roles in newer CLI)
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
+        if let Some(role_str) = value.get("role").and_then(|v| v.as_str()) {
+            let role = match role_str {
+                "assistant" => KimiRole::Assistant,
+                "user" => KimiRole::User,
+                "tool" => KimiRole::Tool,
+                "system" => KimiRole::System,
+                _ => KimiRole::Unknown,
+            };
+
+            let mut blocks = Vec::new();
+            if let Some(content) = value.get("content") {
+                if let Some(text) = content.as_str() {
+                    blocks.push(KimiContentBlock::Text { text: text.to_string() });
+                } else if let Some(arr) = content.as_array() {
+                    for item in arr {
+                        if let Some(typ) = item.get("type").and_then(|v| v.as_str()) {
+                            match typ {
+                                "think" | "thinking" => {
+                                    if let Some(text) = item
+                                        .get("think")
+                                        .and_then(|v| v.as_str())
+                                        .or_else(|| item.get("thinking").and_then(|v| v.as_str()))
+                                    {
+                                        blocks.push(KimiContentBlock::Think {
+                                            think: text.to_string(),
+                                            encrypted: None,
+                                        });
+                                    }
+                                }
+                                "text" => {
+                                    if let Some(text) = item.get("text").and_then(|v| v.as_str()) {
+                                        blocks.push(KimiContentBlock::Text {
+                                            text: text.to_string(),
+                                        });
+                                    }
+                                }
+                                _ => {
+                                    blocks.push(KimiContentBlock::Unknown);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let mut tool_calls = Vec::new();
+            if let Some(tcs) = value.get("tool_calls").and_then(|v| v.as_array()) {
+                for tc in tcs {
+                    if let (Some(id), Some(name), Some(arguments)) = (
+                        tc.get("id").and_then(|v| v.as_str()),
+                        tc.get("function")
+                            .and_then(|f| f.get("name"))
+                            .and_then(|v| v.as_str()),
+                        tc.get("function")
+                            .and_then(|f| f.get("arguments"))
+                            .and_then(|v| v.as_str()),
+                    ) {
+                        tool_calls.push(KimiToolCall {
+                            call_type: "function".to_string(),
+                            id: id.to_string(),
+                            function: KimiFunctionCall {
+                                name: name.to_string(),
+                                arguments: arguments.to_string(),
+                            },
+                        });
+                    }
+                }
+            }
+
+            return Some(ParsedKimiEvent::Message(KimiMessage {
+                role,
+                content: KimiContent::Blocks(blocks),
+                tool_calls,
+                tool_call_id: value
+                    .get("tool_call_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+            }));
+        }
+
+        // Handle new event-based formats (Thought, Message, ToolCall, etc.)
         // Handle Thought {"Thought": {"type": "text", "text": "..."}}
         if let Some(thought) = value.get("Thought") {
             if let Some(text) = thought.get("text").and_then(|v| v.as_str()) {
@@ -540,10 +626,10 @@ impl StandardCodingAgentExecutor for KimiCode {
                                         KimiContentBlock::Think { think, .. } => {
                                             // Skip thinking blocks that just describe tool calls
                                             // if they are followed by actual tool_calls
-                                            if msg.tool_calls.is_empty()
-                                                || think.len() < 100
-                                                || !think.contains("tool")
-                                            {
+                                            let should_skip = !msg.tool_calls.is_empty()
+                                                && think.len() >= 100
+                                                && think.contains("tool");
+                                            if !should_skip {
                                                 current_message = None;
                                                 message_index = None;
 
@@ -608,6 +694,9 @@ impl StandardCodingAgentExecutor for KimiCode {
                                                 }
                                             }
                                         }
+                                        KimiContentBlock::Unknown => {
+                                            // Silently ignore unknown block types
+                                        }
                                     }
                                 }
 
@@ -656,6 +745,7 @@ impl StandardCodingAgentExecutor for KimiCode {
                                         .map(|c| match c {
                                             KimiContentBlock::Text { text } => text.clone(),
                                             KimiContentBlock::Think { think, .. } => think.clone(),
+                                            KimiContentBlock::Unknown => String::new(),
                                         })
                                         .collect(),
                                 };
