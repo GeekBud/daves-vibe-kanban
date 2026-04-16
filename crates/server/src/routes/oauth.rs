@@ -261,7 +261,7 @@ async fn status(
         .remote_auth_degraded_slug()
         .await
         .map(|_| true);
-    let local_mode = Some(deployment.remote_client().is_err());
+    let local_mode = Some(true);
 
     match login_status {
         LoginStatus::LoggedOut => Ok(ResponseJson(ApiResponse::success(StatusResponse {

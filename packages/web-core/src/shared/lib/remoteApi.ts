@@ -20,6 +20,7 @@ const BUILD_TIME_API_BASE = import.meta.env.VITE_VK_SHARED_API_BASE || '';
 // Mutable module-level variable — overridden at runtime by ConfigProvider
 // when VK_SHARED_API_BASE is set (for self-hosting support)
 let _remoteApiBase: string = BUILD_TIME_API_BASE;
+let _isLocalMode = false;
 
 /**
  * Set the remote API base URL at runtime.
@@ -31,6 +32,14 @@ export function setRemoteApiBase(base: string | null | undefined) {
   if (_remoteApiBase) {
     syncRelayApiBaseWithRemote(_remoteApiBase);
   }
+}
+
+export function setLocalMode(value: boolean) {
+  _isLocalMode = value;
+}
+
+export function isLocalMode(): boolean {
+  return _isLocalMode;
 }
 
 /**
@@ -58,17 +67,20 @@ async function makeAuthenticatedRequest(
   options: RequestInit = {},
   retryOn401 = true
 ): Promise<Response> {
-  const authRuntime = getAuthRuntime();
-  const token = await authRuntime.getToken();
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-
   const headers = new Headers(options.headers ?? {});
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  headers.set('Authorization', `Bearer ${token}`);
+
+  if (!_isLocalMode) {
+    const authRuntime = getAuthRuntime();
+    const token = await authRuntime.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   headers.set('X-Client-Version', __APP_VERSION__);
   headers.set('X-Client-Type', 'frontend');
 
@@ -78,8 +90,9 @@ async function makeAuthenticatedRequest(
     credentials: 'include',
   });
 
-  // Handle 401 - token may have expired
-  if (response.status === 401 && retryOn401) {
+  // Handle 401 - token may have expired (skip in local mode)
+  if (response.status === 401 && retryOn401 && !_isLocalMode) {
+    const authRuntime = getAuthRuntime();
     const newToken = await authRuntime.triggerRefresh();
     if (newToken) {
       // Retry the request with the new token

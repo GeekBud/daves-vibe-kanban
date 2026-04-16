@@ -146,6 +146,18 @@ impl Deployment for LocalDeployment {
             DBService::new_with_after_connect(hook).await?
         };
 
+        // Seed default local kanban organization if none exists (local mode)
+        {
+            let pool = db.pool.clone();
+            tokio::spawn(async move {
+                if let Err(e) = db::models::kanban::KanbanOrganization::seed_default(&pool).await {
+                    tracing::warn!(?e, "Failed to seed default kanban organization");
+                } else {
+                    tracing::info!("Default kanban organization ready");
+                }
+            });
+        }
+
         let file = FileService::new(db.clone().pool)?;
         {
             let file_service = file.clone();

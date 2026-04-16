@@ -44,7 +44,7 @@ export function useUserSystemController({
   const machineId = userSystemInfo?.machine_id || null;
   const loginStatus = userSystemInfo?.login_status || null;
   const remoteAuthDegraded = userSystemInfo?.remote_auth_degraded || null;
-  const localMode = userSystemInfo?.local_mode ?? false;
+  const localMode = userSystemInfo?.local_mode ?? true;
   const profiles =
     (userSystemInfo?.executors as Record<string, ExecutorProfile> | null) ||
     null;

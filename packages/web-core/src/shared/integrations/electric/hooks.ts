@@ -1,7 +1,10 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from '@tanstack/react-db';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createShapeCollection } from '@/shared/lib/electric/collections';
 import { useSyncErrorContext } from '@/shared/hooks/useSyncErrorContext';
+import { useAuth } from '@/shared/hooks/auth/useAuth';
+import { makeRequest } from '@/shared/lib/remoteApi';
 import type { MutationDefinition, ShapeDefinition } from 'shared/remote-types';
 import type { SyncError } from '@/shared/lib/electric/types';
 import type { MutationResult, InsertResult } from '@/shared/lib/electric/types';
@@ -64,24 +67,61 @@ export interface UseShapeOptions<
   mutation?: M;
 }
 
+// =============================================================================
+// Local-mode helpers
+// =============================================================================
+
+function buildFallbackUrl(
+  fallbackUrl: string,
+  params: Record<string, string>
+): string {
+  let url = fallbackUrl;
+  for (const [key, value] of Object.entries(params)) {
+    url = url.replace(`{${key}}`, encodeURIComponent(value));
+  }
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (!value) continue;
+    query.set(key, value);
+  }
+  const queryString = query.toString();
+  return queryString ? `${url}?${queryString}` : url;
+}
+
+async function fetchLocalShape<T>(
+  shape: ShapeDefinition<T>,
+  params: Record<string, string>
+): Promise<T[]> {
+  const path = buildFallbackUrl(shape.fallbackUrl, params);
+  const response = await makeRequest(path, { method: 'GET', cache: 'no-store' });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || body.error || `Failed to fetch ${shape.table}`);
+  }
+  const payload = (await response.json()) as Record<string, unknown>;
+  // Local backend wraps responses in ApiResponse { success, data }
+  const data = (payload.data ?? payload) as Record<string, unknown>;
+  const rows = data[shape.table];
+  if (!Array.isArray(rows)) {
+    throw new Error(`Fallback response missing "${shape.table}" array`);
+  }
+  return rows as T[];
+}
+
+async function parseError(response: Response, fallback: string): Promise<never> {
+  const body = await response.json().catch(() => ({}));
+  throw new Error(body.message || body.error || fallback);
+}
+
+// =============================================================================
+// useShape hook
+// =============================================================================
+
 /**
  * Hook for subscribing to a shape's data via Electric sync,
  * with optional optimistic mutation support.
  *
- * @param shape - The shape definition from shared/remote-types.ts
- * @param params - URL parameters matching the shape's requirements
- * @param options - Optional configuration (enabled, mutation, etc.)
- *
- * @example
- * // Read-only:
- * const { data, isLoading } = useShape(PROJECT_PULL_REQUESTS_SHAPE, { project_id });
- *
- * // With mutations:
- * const { data, insert, update, remove } = useShape(
- *   PROJECT_ISSUES_SHAPE,
- *   { project_id },
- *   { mutation: ISSUE_MUTATION }
- * );
+ * In local mode, falls back to polling the local backend API.
  */
 export function useShape<
   T extends Record<string, unknown>,
@@ -96,6 +136,8 @@ export function useShape<
   ? UseShapeMutationResult<T, MutationCreateType<M>, MutationUpdateType<M>>
   : UseShapeResult<T> {
   const { enabled = true, mutation } = options;
+  const { isLocalMode } = useAuth();
+  const queryClient = useQueryClient();
 
   const [error, setError] = useState<SyncError | null>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -109,7 +151,10 @@ export function useShape<
   const retry = useCallback(() => {
     setError(null);
     setRetryKey((k) => k + 1);
-  }, []);
+    if (isLocalMode) {
+      queryClient.invalidateQueries({ queryKey: ['local-shape', shape.table, params] });
+    }
+  }, [isLocalMode, queryClient, shape.table, params]);
 
   const paramsKey = JSON.stringify(params);
   const stableParams = useMemo(
@@ -134,26 +179,53 @@ export function useShape<
     };
   }, [error, streamId, shape.table, retry, registerErrorFn, clearErrorFn]);
 
+  // ---------------------------------------------------------------------------
+  // Local mode: use TanStack Query polling
+  // ---------------------------------------------------------------------------
+  const localQuery = useQuery({
+    queryKey: ['local-shape', shape.table, stableParams, retryKey],
+    queryFn: () => fetchLocalShape(shape, stableParams),
+    enabled: enabled && isLocalMode,
+    refetchInterval: 3000,
+    staleTime: 2000,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Electric mode: use Electric sync
+  // ---------------------------------------------------------------------------
   const collection = useMemo(() => {
-    if (!enabled) return null;
+    if (!enabled || isLocalMode) return null;
     const config = { onError: handleError };
     void retryKey;
     return createShapeCollection(shape, stableParams, config, mutation);
-  }, [enabled, shape, mutation, handleError, retryKey, stableParams]);
+  }, [enabled, isLocalMode, shape, mutation, handleError, retryKey, stableParams]);
 
-  const { data, isLoading: queryLoading } = useLiveQuery(
+  const { data: liveData, isLoading: queryLoading } = useLiveQuery(
     (query) => (collection ? query.from({ item: collection }) : undefined),
     [collection]
   );
 
   const items = useMemo(() => {
-    if (!enabled || !collection || !data || queryLoading) return [];
-    return data as unknown as T[];
-  }, [enabled, collection, data, queryLoading]);
+    if (!enabled) return [];
+    if (isLocalMode) {
+      return (localQuery.data ?? []) as T[];
+    }
+    if (!collection || !liveData || queryLoading) return [];
+    return liveData as unknown as T[];
+  }, [enabled, isLocalMode, localQuery.data, collection, liveData, queryLoading]);
 
-  const isLoading = enabled ? queryLoading : false;
+  const isLoading = enabled
+    ? isLocalMode
+      ? localQuery.isLoading
+      : queryLoading
+    : false;
 
-  // --- Mutation support (only used when mutation is provided) ---
+  const localError = localQuery.error
+    ? { message: (localQuery.error as Error).message }
+    : null;
+  const effectiveError = isLocalMode ? localError : error;
+
+  // --- Mutation support ---
 
   const itemsRef = useRef<T[]>([]);
   useEffect(() => {
@@ -184,6 +256,26 @@ export function useShape<
         id: crypto.randomUUID(),
         ...(insertData as Record<string, unknown>),
       };
+
+      if (isLocalMode && mutation) {
+        const promise = makeRequest(mutation.url, {
+          method: 'POST',
+          body: JSON.stringify(dataWithId),
+        })
+          .then(async (res) => {
+            if (!res.ok) await parseError(res, `Failed to create ${mutation.name}`);
+            // invalidate after mutation
+            queryClient.invalidateQueries({ queryKey: ['local-shape', shape.table, stableParams] });
+          })
+          .then(() => {
+            const synced = itemsRef.current.find(
+              (item) => (item as unknown as { id: string }).id === dataWithId.id
+            );
+            return (synced ?? dataWithId) as unknown as T;
+          });
+        return { data: dataWithId as unknown as T, persisted: promise };
+      }
+
       if (!typedCollection) {
         return {
           data: dataWithId as unknown as T,
@@ -201,11 +293,23 @@ export function useShape<
         }),
       };
     },
-    [typedCollection]
+    [typedCollection, isLocalMode, mutation, queryClient, shape.table, stableParams]
   );
 
   const update = useCallback(
     (id: string, changes: unknown): MutationResult => {
+      if (isLocalMode && mutation) {
+        const promise = makeRequest(`${mutation.url}/${id}`, {
+          method: 'POST',
+          body: JSON.stringify(changes),
+        })
+          .then(async (res) => {
+            if (!res.ok) await parseError(res, `Failed to update ${mutation.name}`);
+            queryClient.invalidateQueries({ queryKey: ['local-shape', shape.table, stableParams] });
+          });
+        return { persisted: promise };
+      }
+
       if (!typedCollection) {
         return { persisted: Promise.resolve() };
       }
@@ -214,11 +318,23 @@ export function useShape<
       );
       return { persisted: tx.isPersisted.promise };
     },
-    [typedCollection]
+    [typedCollection, isLocalMode, mutation, queryClient, shape.table, stableParams]
   );
 
   const updateMany = useCallback(
     (updates: Array<{ id: string; changes: unknown }>): MutationResult => {
+      if (isLocalMode && mutation && updates.length > 0) {
+        const promise = makeRequest(`${mutation.url}/bulk`, {
+          method: 'POST',
+          body: JSON.stringify({ updates: updates.map((u) => ({ id: u.id, ...(u.changes as Record<string, unknown>) })) }),
+        })
+          .then(async (res) => {
+            if (!res.ok) await parseError(res, `Failed to bulk update ${mutation.name}`);
+            queryClient.invalidateQueries({ queryKey: ['local-shape', shape.table, stableParams] });
+          });
+        return { persisted: promise };
+      }
+
       if (!typedCollection || updates.length === 0) {
         return { persisted: Promise.resolve() };
       }
@@ -243,24 +359,35 @@ export function useShape<
 
       return { persisted: tx.isPersisted.promise };
     },
-    [typedCollection]
+    [typedCollection, isLocalMode, mutation, queryClient, shape.table, stableParams]
   );
 
   const remove = useCallback(
     (id: string): MutationResult => {
+      if (isLocalMode && mutation) {
+        const promise = makeRequest(`${mutation.url}/${id}`, {
+          method: 'DELETE',
+        })
+          .then(async (res) => {
+            if (!res.ok) await parseError(res, `Failed to delete ${mutation.name}`);
+            queryClient.invalidateQueries({ queryKey: ['local-shape', shape.table, stableParams] });
+          });
+        return { persisted: promise };
+      }
+
       if (!typedCollection) {
         return { persisted: Promise.resolve() };
       }
       const tx = typedCollection.delete(id);
       return { persisted: tx.isPersisted.promise };
     },
-    [typedCollection]
+    [typedCollection, isLocalMode, mutation, queryClient, shape.table, stableParams]
   );
 
   const base: UseShapeResult<T> = {
     data: items,
     isLoading,
-    error,
+    error: effectiveError,
     retry,
   };
 

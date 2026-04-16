@@ -1342,7 +1342,27 @@ const handleRemoteResponse = async <T>(response: Response): Promise<T> => {
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  const result = await response.json();
+
+  // Local backend wraps responses in ApiResponse { success, data }.
+  // Remote backend may return the payload directly. Detect and unwrap.
+  if (
+    result &&
+    typeof result === 'object' &&
+    'success' in result &&
+    'data' in result
+  ) {
+    if (!result.success) {
+      throw new ApiError(
+        result.message || 'API request failed',
+        response.status,
+        response
+      );
+    }
+    return result.data as T;
+  }
+
+  return result as T;
 };
 
 // Organizations API

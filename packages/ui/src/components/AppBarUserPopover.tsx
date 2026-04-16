@@ -60,7 +60,7 @@ export function AppBarUserPopover({
     defaultValue: 'Settings',
   });
 
-  if (!isSignedIn) {
+  if (!isSignedIn && !isLocalMode) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -161,10 +161,14 @@ export function AppBarUserPopover({
             </DropdownMenuItem>
           </>
         )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem icon={SignOutIcon} onClick={onLogout}>
-          {t('signOut')}
-        </DropdownMenuItem>
+        {isSignedIn && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem icon={SignOutIcon} onClick={onLogout}>
+              {t('signOut')}
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

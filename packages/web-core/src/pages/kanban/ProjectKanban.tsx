@@ -258,7 +258,7 @@ export function ProjectKanban() {
     useCurrentKanbanRouteState();
   const appNavigation = useAppNavigation();
   const { t } = useTranslation('common');
-  const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const { isSignedIn, isLocalMode, isLoaded: authLoaded } = useAuth();
   const issueComposerKey = useMemo(() => {
     if (!projectId) {
       return null;
@@ -301,8 +301,8 @@ export function ProjectKanban() {
     );
   }
 
-  // If not signed in, prompt user to log in
-  if (!isSignedIn) {
+  // If not signed in and not in local mode, prompt user to log in
+  if (!isSignedIn && !isLocalMode) {
     return (
       <div className="flex items-center justify-center h-full w-full p-base">
         <LoginRequiredPrompt

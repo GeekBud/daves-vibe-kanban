@@ -149,7 +149,7 @@ function resolveTheme(theme: ThemeMode): 'light' | 'dark' {
 export function LandingPage() {
   const appNavigation = useAppNavigation();
   const { theme } = useTheme();
-  const { config, profiles, updateAndSaveConfig, loading } = useUserSystem();
+  const { config, profiles, updateAndSaveConfig, loading, localMode } = useUserSystem();
   const posthog = usePostHog();
 
   const [initialized, setInitialized] = useState(false);
@@ -297,13 +297,23 @@ export function LandingPage() {
     setSaving(false);
 
     if (success) {
-      trackRemoteOnboardingEvent(REMOTE_ONBOARDING_EVENTS.STAGE_COMPLETED, {
-        stage: 'landing',
-        destination: '/onboarding/sign-in',
-      });
-      appNavigation.goToOnboardingSignIn({
-        replace: true,
-      });
+      if (localMode) {
+        trackRemoteOnboardingEvent(REMOTE_ONBOARDING_EVENTS.STAGE_COMPLETED, {
+          stage: 'landing',
+          destination: '/workspaces',
+        });
+        appNavigation.goToWorkspacesCreate({
+          replace: true,
+        });
+      } else {
+        trackRemoteOnboardingEvent(REMOTE_ONBOARDING_EVENTS.STAGE_COMPLETED, {
+          stage: 'landing',
+          destination: '/onboarding/sign-in',
+        });
+        appNavigation.goToOnboardingSignIn({
+          replace: true,
+        });
+      }
       return;
     }
 

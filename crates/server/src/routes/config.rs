@@ -171,9 +171,9 @@ async fn get_user_system_info(
             }
             caps
         },
-        shared_api_base: deployment.remote_info().get_api_base(),
+        shared_api_base: Some("/api".to_string()),
         preview_proxy_port: deployment.client_info().get_preview_proxy_port(),
-        local_mode: deployment.remote_client().is_err(),
+        local_mode: true,
     };
 
     ResponseJson(ApiResponse::success(user_system_info))

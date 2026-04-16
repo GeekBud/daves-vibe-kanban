@@ -8,12 +8,12 @@ import { organizationKeys } from '@/shared/hooks/organizationKeys';
  * Hook to fetch all organizations that the current user is a member of
  */
 export function useUserOrganizations() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLocalMode } = useAuth();
 
   return useQuery<ListOrganizationsResponse>({
     queryKey: organizationKeys.userList(),
     queryFn: () => organizationsApi.getUserOrganizations(),
-    enabled: isSignedIn,
+    enabled: isSignedIn || isLocalMode,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

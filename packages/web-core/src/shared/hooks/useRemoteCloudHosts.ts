@@ -5,6 +5,7 @@ import type { PairRelayHostRequest, RelayPairedHost } from 'shared/types';
 import type { RelayHost } from 'shared/remote-types';
 import { relayApi } from '@/shared/lib/api';
 import { listRelayHosts } from '@/shared/lib/remoteApi';
+import { useAuth } from '@/shared/hooks/auth/useAuth';
 
 export type RemoteCloudHostStatus = AppBarHostStatus;
 
@@ -72,9 +73,12 @@ async function fetchRemoteCloudHostsState(): Promise<RemoteCloudHostsState> {
 }
 
 export function useRemoteCloudHostsState() {
+  const { isLocalMode } = useAuth();
+
   return useQuery({
     queryKey: REMOTE_CLOUD_HOSTS_STATE_QUERY_KEY,
     queryFn: fetchRemoteCloudHostsState,
+    enabled: !isLocalMode,
     staleTime: 0,
   });
 }
