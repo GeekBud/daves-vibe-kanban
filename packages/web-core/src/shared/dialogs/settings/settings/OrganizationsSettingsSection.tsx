@@ -44,7 +44,7 @@ import { SettingsCard, SettingsField } from './SettingsComponents';
 
 export function OrganizationsSettingsSection() {
   const { t } = useTranslation('organization');
-  const { isSignedIn, isLoaded, userId } = useAuth();
+  const { isSignedIn, isLoaded, userId, isLocalMode } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isOpeningBilling, setIsOpeningBilling] = useState(false);
@@ -260,7 +260,7 @@ export function OrganizationsSettingsSection() {
     );
   }
 
-  if (!isSignedIn) {
+  if (!isSignedIn && !isLocalMode) {
     return (
       <div className="space-y-4">
         <div>

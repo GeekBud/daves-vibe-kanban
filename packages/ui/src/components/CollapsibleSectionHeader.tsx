@@ -126,7 +126,7 @@ export function CollapsibleSectionHeader({
   );
 
   return (
-    <div className={cn('flex flex-col h-full min-h-0', className)}>
+    <div className={cn('flex flex-col min-h-0', className)}>
       <div className="">
         {collapsible ? (
           <button

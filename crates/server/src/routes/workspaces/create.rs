@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use axum::{Json, extract::State, response::Json as ResponseJson};
 use db::models::{
+    kanban::{CreateKanbanWorkspace, KanbanWorkspace},
     requests::{
         CreateAndStartWorkspaceRequest, CreateAndStartWorkspaceResponse, CreateWorkspaceApiRequest,
     },
     workspace::{CreateWorkspace, Workspace},
 };
 use deployment::Deployment;
-use services::services::container::ContainerService;
+use services::services::{container::ContainerService, diff_stream};
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -250,44 +251,70 @@ pub async fn create_and_start_workspace(
         managed_workspace.associate_attachments(ids).await?;
     }
 
-    if let Some(linked_issue) = &linked_issue
-        && let Ok(client) = deployment.remote_client()
-    {
-        match import_issue_attachments_from_remote(
-            &client,
-            deployment.file(),
-            linked_issue.issue_id,
+    if let Some(linked_issue) = &linked_issue {
+        let workspace_for_stats = managed_workspace.workspace.clone();
+        let stats = diff_stream::compute_diff_stats(
+            &deployment.db().pool,
+            deployment.git(),
+            &workspace_for_stats,
         )
-        .await
-        {
-            Ok(imported_attachments) if !imported_attachments.is_empty() => {
-                let imported_ids = imported_attachments
-                    .iter()
-                    .map(|imported| imported.file.id)
-                    .collect::<Vec<_>>();
+        .await;
 
-                if let Err(e) = managed_workspace.associate_attachments(&imported_ids).await {
-                    tracing::warn!("Failed to associate imported files with workspace: {}", e);
+        let owner_user_id = Uuid::parse_str(deployment.user_id()).unwrap_or_else(|_| Uuid::nil());
+
+        KanbanWorkspace::create_or_replace(
+            &deployment.db().pool,
+            &CreateKanbanWorkspace {
+                project_id: linked_issue.remote_project_id,
+                owner_user_id,
+                issue_id: Some(linked_issue.issue_id),
+                local_workspace_id: Some(workspace_for_stats.id),
+                name: workspace_for_stats.name.clone(),
+                archived: workspace_for_stats.archived,
+                files_changed: stats.as_ref().map(|s| s.files_changed as i64),
+                lines_added: stats.as_ref().map(|s| s.lines_added as i64),
+                lines_removed: stats.as_ref().map(|s| s.lines_removed as i64),
+            },
+        )
+        .await?;
+
+        if let Ok(client) = deployment.remote_client() {
+            match import_issue_attachments_from_remote(
+                &client,
+                deployment.file(),
+                linked_issue.issue_id,
+            )
+            .await
+            {
+                Ok(imported_attachments) if !imported_attachments.is_empty() => {
+                    let imported_ids = imported_attachments
+                        .iter()
+                        .map(|imported| imported.file.id)
+                        .collect::<Vec<_>>();
+
+                    if let Err(e) = managed_workspace.associate_attachments(&imported_ids).await {
+                        tracing::warn!("Failed to associate imported files with workspace: {}", e);
+                    }
+
+                    workspace_prompt = rewrite_imported_issue_attachments_markdown(
+                        &workspace_prompt,
+                        &imported_attachments,
+                    );
+
+                    tracing::info!(
+                        "Imported {} files from issue {}",
+                        imported_ids.len(),
+                        linked_issue.issue_id
+                    );
                 }
-
-                workspace_prompt = rewrite_imported_issue_attachments_markdown(
-                    &workspace_prompt,
-                    &imported_attachments,
-                );
-
-                tracing::info!(
-                    "Imported {} files from issue {}",
-                    imported_ids.len(),
-                    linked_issue.issue_id
-                );
-            }
-            Ok(_) => {}
-            Err(e) => {
-                tracing::warn!(
-                    "Failed to import issue attachments for issue {}: {}",
-                    linked_issue.issue_id,
-                    e
-                );
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to import issue attachments for issue {}: {}",
+                        linked_issue.issue_id,
+                        e
+                    );
+                }
             }
         }
     }

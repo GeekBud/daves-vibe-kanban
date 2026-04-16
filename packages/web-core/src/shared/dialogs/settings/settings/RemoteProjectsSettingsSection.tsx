@@ -338,7 +338,7 @@ export function RemoteProjectsSettingsSection({
 }: RemoteProjectsSettingsSectionProps) {
   const { t } = useTranslation(['settings', 'common', 'projects']);
   const { setDirty: setContextDirty } = useSettingsDirty();
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, isLocalMode } = useAuth();
 
   // Selection state - initialize with provided values
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(
@@ -1000,8 +1000,8 @@ export function RemoteProjectsSettingsSection({
     );
   }
 
-  // Auth check - show sign-in prompt if not signed in
-  if (!isSignedIn) {
+  // Auth check - show sign-in prompt if not signed in (unless in local mode)
+  if (!isSignedIn && !isLocalMode) {
     return (
       <div className="space-y-4">
         <div>

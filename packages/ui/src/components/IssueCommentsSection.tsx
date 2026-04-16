@@ -143,32 +143,31 @@ export function IssueCommentsSection({
     >
       <div className="p-base flex flex-col gap-base border-t">
         {/* Comments list */}
-        {isLoading ? (
-          <div className="flex flex-col gap-double animate-pulse">
-            <div className="h-4 bg-secondary rounded w-3/4" />
-            <div className="h-4 bg-secondary rounded w-1/2" />
-          </div>
-        ) : comments.length === 0 ? (
-          <p className="text-low">{t('kanban.noCommentsYet')}</p>
-        ) : (
-          comments.map((comment) => (
-            <CommentItem
-              key={comment.id}
-              comment={comment}
-              isEditing={editingCommentId === comment.id}
-              editValue={editingCommentId === comment.id ? editingValue : ''}
-              onEditValueChange={onEditingValueChange}
-              onStartEdit={() => onStartEdit(comment.id)}
-              onSaveEdit={onSaveEdit}
-              onCancelEdit={onCancelEdit}
-              onDelete={() => onDeleteComment(comment.id)}
-              reactions={reactionsByCommentId.get(comment.id) ?? []}
-              onToggleReaction={(emoji) => onToggleReaction(comment.id, emoji)}
-              onReply={() => onReply(comment.authorName, comment.message)}
-              renderEditor={renderEditor}
-            />
-          ))
-        )}
+        <div className="min-h-[80px]">
+          {comments.length === 0 ? (
+            !isLoading && (
+              <p className="text-low">{t('kanban.noCommentsYet')}</p>
+            )
+          ) : (
+            comments.map((comment) => (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                isEditing={editingCommentId === comment.id}
+                editValue={editingCommentId === comment.id ? editingValue : ''}
+                onEditValueChange={onEditingValueChange}
+                onStartEdit={() => onStartEdit(comment.id)}
+                onSaveEdit={onSaveEdit}
+                onCancelEdit={onCancelEdit}
+                onDelete={() => onDeleteComment(comment.id)}
+                reactions={reactionsByCommentId.get(comment.id) ?? []}
+                onToggleReaction={(emoji) => onToggleReaction(comment.id, emoji)}
+                onReply={() => onReply(comment.authorName, comment.message)}
+                renderEditor={renderEditor}
+              />
+            ))
+          )}
+        </div>
 
         {/* Comment Input with WYSIWYG + dropzone */}
         <div

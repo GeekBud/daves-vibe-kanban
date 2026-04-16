@@ -29,6 +29,7 @@ const LOCAL_ONLY_API_PREFIXES = [
   '/api/open-remote-editor/',
   '/api/relay-auth/server/',
   '/api/relay-auth/client/',
+  '/api/scratch/',
 ];
 
 function isAbsoluteUrl(pathOrUrl: string): boolean {

@@ -1,11 +1,10 @@
-use chrono::{DateTime, Utc};
-use deployment::Deployment;
 use api_types::{
     Issue, IssueAssignee, IssueComment, IssueCommentReaction, IssueFollower, IssueRelationship,
-    IssueTag, ListIssuesResponse, ListIssueAssigneesResponse, ListIssueCommentsResponse,
-    ListIssueCommentReactionsResponse, ListIssueFollowersResponse, ListIssueRelationshipsResponse,
-    ListIssueTagsResponse, ListOrganizationsResponse, ListProjectStatusesResponse, ListProjectsResponse,
-    ListTagsResponse, MemberRole, OrganizationWithRole, Project, ProjectStatus, Tag, Workspace,
+    IssueTag, ListIssueAssigneesResponse, ListIssueCommentReactionsResponse,
+    ListIssueCommentsResponse, ListIssueFollowersResponse, ListIssueRelationshipsResponse,
+    ListIssueTagsResponse, ListIssuesResponse, ListOrganizationsResponse,
+    ListProjectStatusesResponse, ListProjectsResponse, ListTagsResponse, MemberRole,
+    OrganizationWithRole, Project, ProjectStatus, Tag, Workspace,
 };
 use axum::{
     Router,
@@ -13,6 +12,8 @@ use axum::{
     response::Json as ResponseJson,
     routing::get,
 };
+use chrono::{DateTime, Utc};
+use deployment::Deployment;
 use serde::Deserialize;
 use utils::response::ApiResponse;
 use uuid::Uuid;
@@ -29,6 +30,11 @@ pub struct ProjectScopedFallbackQuery {
     pub project_id: Uuid,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct IssueScopedFallbackQuery {
+    pub issue_id: Uuid,
+}
+
 pub fn router() -> Router<DeploymentImpl> {
     Router::new()
         .route("/fallback/organizations", get(fallback_organizations))
@@ -39,17 +45,32 @@ pub fn router() -> Router<DeploymentImpl> {
         .route("/fallback/issue_assignees", get(fallback_issue_assignees))
         .route("/fallback/issue_followers", get(fallback_issue_followers))
         .route("/fallback/issue_tags", get(fallback_issue_tags))
-        .route("/fallback/issue_relationships", get(fallback_issue_relationships))
+        .route(
+            "/fallback/issue_relationships",
+            get(fallback_issue_relationships),
+        )
         .route("/fallback/issue_comments", get(fallback_issue_comments))
-        .route("/fallback/issue_comment_reactions", get(fallback_issue_comment_reactions))
+        .route(
+            "/fallback/issue_comment_reactions",
+            get(fallback_issue_comment_reactions),
+        )
         .route("/fallback/workspaces", get(fallback_workspaces))
-        .route("/fallback/project_workspaces", get(fallback_project_workspaces))
+        .route(
+            "/fallback/project_workspaces",
+            get(fallback_project_workspaces),
+        )
         .route("/fallback/user_workspaces", get(fallback_user_workspaces))
         .route("/fallback/notifications", get(fallback_notifications))
-        .route("/fallback/organization_members", get(fallback_organization_members))
+        .route(
+            "/fallback/organization_members",
+            get(fallback_organization_members),
+        )
         .route("/fallback/users", get(fallback_users))
         .route("/fallback/pull_requests", get(fallback_pull_requests))
-        .route("/fallback/pull_request_issues", get(fallback_pull_request_issues))
+        .route(
+            "/fallback/pull_request_issues",
+            get(fallback_pull_request_issues),
+        )
 }
 
 pub(super) fn db_to_api_project(p: db::models::kanban::KanbanProject) -> Project {
@@ -78,10 +99,15 @@ pub(super) fn db_to_api_issue(i: db::models::kanban::KanbanIssue) -> Issue {
     });
 
     let parse_dt = |s: &Option<String>| -> Option<DateTime<Utc>> {
-        s.as_ref().and_then(|d| DateTime::parse_from_rfc3339(d).ok().map(|dt| dt.with_timezone(&Utc)))
+        s.as_ref().and_then(|d| {
+            DateTime::parse_from_rfc3339(d)
+                .ok()
+                .map(|dt| dt.with_timezone(&Utc))
+        })
     };
 
-    let extension_metadata: Value = serde_json::from_str(&i.extension_metadata).unwrap_or(Value::Object(Default::default()));
+    let extension_metadata: Value =
+        serde_json::from_str(&i.extension_metadata).unwrap_or(Value::Object(Default::default()));
 
     Issue {
         id: i.id,
@@ -143,7 +169,9 @@ pub(super) fn db_to_api_issue_tag(t: db::models::kanban::KanbanIssueTag) -> Issu
     }
 }
 
-pub(super) fn db_to_api_relationship(r: db::models::kanban::KanbanIssueRelationship) -> IssueRelationship {
+pub(super) fn db_to_api_relationship(
+    r: db::models::kanban::KanbanIssueRelationship,
+) -> IssueRelationship {
     use api_types::IssueRelationshipType;
     IssueRelationship {
         id: r.id,
@@ -187,7 +215,9 @@ pub(super) fn db_to_api_comment(c: db::models::kanban::KanbanIssueComment) -> Is
     }
 }
 
-pub(super) fn db_to_api_reaction(r: db::models::kanban::KanbanIssueCommentReaction) -> IssueCommentReaction {
+pub(super) fn db_to_api_reaction(
+    r: db::models::kanban::KanbanIssueCommentReaction,
+) -> IssueCommentReaction {
     IssueCommentReaction {
         id: r.id,
         comment_id: r.comment_id,
@@ -223,7 +253,9 @@ async fn fallback_organizations(
             user_role: MemberRole::Admin,
         })
         .collect();
-    Ok(ResponseJson(ApiResponse::success(ListOrganizationsResponse { organizations })))
+    Ok(ResponseJson(ApiResponse::success(
+        ListOrganizationsResponse { organizations },
+    )))
 }
 
 async fn fallback_projects(
@@ -231,9 +263,12 @@ async fn fallback_projects(
     Query(query): Query<ProjectFallbackQuery>,
 ) -> Result<ResponseJson<ApiResponse<ListProjectsResponse>>, ApiError> {
     let pool = &deployment.db().pool;
-    let rows = db::models::kanban::KanbanProject::find_by_organization(pool, query.organization_id).await?;
+    let rows = db::models::kanban::KanbanProject::find_by_organization(pool, query.organization_id)
+        .await?;
     let projects = rows.into_iter().map(db_to_api_project).collect();
-    Ok(ResponseJson(ApiResponse::success(ListProjectsResponse { projects })))
+    Ok(ResponseJson(ApiResponse::success(ListProjectsResponse {
+        projects,
+    })))
 }
 
 async fn fallback_issues(
@@ -244,7 +279,12 @@ async fn fallback_issues(
     let rows = db::models::kanban::KanbanIssue::find_by_project(pool, query.project_id).await?;
     let issues: Vec<Issue> = rows.into_iter().map(db_to_api_issue).collect();
     let total_count = issues.len();
-    Ok(ResponseJson(ApiResponse::success(ListIssuesResponse { issues, total_count, limit: total_count, offset: 0 })))
+    Ok(ResponseJson(ApiResponse::success(ListIssuesResponse {
+        issues,
+        total_count,
+        limit: total_count,
+        offset: 0,
+    })))
 }
 
 async fn fallback_tags(
@@ -254,7 +294,9 @@ async fn fallback_tags(
     let pool = &deployment.db().pool;
     let rows = db::models::kanban::KanbanTag::find_by_project(pool, query.project_id).await?;
     let tags = rows.into_iter().map(db_to_api_tag).collect();
-    Ok(ResponseJson(ApiResponse::success(ListTagsResponse { tags })))
+    Ok(ResponseJson(ApiResponse::success(ListTagsResponse {
+        tags,
+    })))
 }
 
 async fn fallback_project_statuses(
@@ -262,9 +304,12 @@ async fn fallback_project_statuses(
     Query(query): Query<ProjectScopedFallbackQuery>,
 ) -> Result<ResponseJson<ApiResponse<ListProjectStatusesResponse>>, ApiError> {
     let pool = &deployment.db().pool;
-    let rows = db::models::kanban::KanbanProjectStatus::find_by_project(pool, query.project_id).await?;
+    let rows =
+        db::models::kanban::KanbanProjectStatus::find_by_project(pool, query.project_id).await?;
     let project_statuses = rows.into_iter().map(db_to_api_status).collect();
-    Ok(ResponseJson(ApiResponse::success(ListProjectStatusesResponse { project_statuses })))
+    Ok(ResponseJson(ApiResponse::success(
+        ListProjectStatusesResponse { project_statuses },
+    )))
 }
 
 async fn fallback_issue_assignees(
@@ -280,7 +325,11 @@ async fn fallback_issue_assignees(
         let rows = db::models::kanban::KanbanIssueAssignee::find_by_issue(pool, issue.id).await?;
         assignees.extend(rows.into_iter().map(db_to_api_assignee));
     }
-    Ok(ResponseJson(ApiResponse::success(ListIssueAssigneesResponse { issue_assignees: assignees })))
+    Ok(ResponseJson(ApiResponse::success(
+        ListIssueAssigneesResponse {
+            issue_assignees: assignees,
+        },
+    )))
 }
 
 async fn fallback_issue_followers(
@@ -294,7 +343,11 @@ async fn fallback_issue_followers(
         let rows = db::models::kanban::KanbanIssueFollower::find_by_issue(pool, issue.id).await?;
         followers.extend(rows.into_iter().map(db_to_api_follower));
     }
-    Ok(ResponseJson(ApiResponse::success(ListIssueFollowersResponse { issue_followers: followers })))
+    Ok(ResponseJson(ApiResponse::success(
+        ListIssueFollowersResponse {
+            issue_followers: followers,
+        },
+    )))
 }
 
 async fn fallback_issue_tags(
@@ -308,7 +361,9 @@ async fn fallback_issue_tags(
         let rows = db::models::kanban::KanbanIssueTag::find_by_issue(pool, issue.id).await?;
         issue_tags.extend(rows.into_iter().map(db_to_api_issue_tag));
     }
-    Ok(ResponseJson(ApiResponse::success(ListIssueTagsResponse { issue_tags })))
+    Ok(ResponseJson(ApiResponse::success(ListIssueTagsResponse {
+        issue_tags,
+    })))
 }
 
 async fn fallback_issue_relationships(
@@ -319,41 +374,50 @@ async fn fallback_issue_relationships(
     let issues = db::models::kanban::KanbanIssue::find_by_project(pool, query.project_id).await?;
     let mut relationships = Vec::new();
     for issue in issues {
-        let rows = db::models::kanban::KanbanIssueRelationship::find_by_issue(pool, issue.id).await?;
+        let rows =
+            db::models::kanban::KanbanIssueRelationship::find_by_issue(pool, issue.id).await?;
         relationships.extend(rows.into_iter().map(db_to_api_relationship));
     }
-    Ok(ResponseJson(ApiResponse::success(ListIssueRelationshipsResponse { issue_relationships: relationships })))
+    Ok(ResponseJson(ApiResponse::success(
+        ListIssueRelationshipsResponse {
+            issue_relationships: relationships,
+        },
+    )))
 }
 
 async fn fallback_issue_comments(
     State(deployment): State<DeploymentImpl>,
-    Query(query): Query<ProjectScopedFallbackQuery>,
+    Query(query): Query<IssueScopedFallbackQuery>,
 ) -> Result<ResponseJson<ApiResponse<ListIssueCommentsResponse>>, ApiError> {
     let pool = &deployment.db().pool;
-    let issues = db::models::kanban::KanbanIssue::find_by_project(pool, query.project_id).await?;
-    let mut comments = Vec::new();
-    for issue in issues {
-        let rows = db::models::kanban::KanbanIssueComment::find_by_issue(pool, issue.id).await?;
-        comments.extend(rows.into_iter().map(db_to_api_comment));
-    }
-    Ok(ResponseJson(ApiResponse::success(ListIssueCommentsResponse { issue_comments: comments })))
+    let rows = db::models::kanban::KanbanIssueComment::find_by_issue(pool, query.issue_id).await?;
+    let comments = rows.into_iter().map(db_to_api_comment).collect();
+    Ok(ResponseJson(ApiResponse::success(
+        ListIssueCommentsResponse {
+            issue_comments: comments,
+        },
+    )))
 }
 
 async fn fallback_issue_comment_reactions(
     State(deployment): State<DeploymentImpl>,
-    Query(query): Query<ProjectScopedFallbackQuery>,
+    Query(query): Query<IssueScopedFallbackQuery>,
 ) -> Result<ResponseJson<ApiResponse<ListIssueCommentReactionsResponse>>, ApiError> {
     let pool = &deployment.db().pool;
-    let issues = db::models::kanban::KanbanIssue::find_by_project(pool, query.project_id).await?;
+    let comments =
+        db::models::kanban::KanbanIssueComment::find_by_issue(pool, query.issue_id).await?;
     let mut reactions = Vec::new();
-    for issue in issues {
-        let comments = db::models::kanban::KanbanIssueComment::find_by_issue(pool, issue.id).await?;
-        for comment in comments {
-            let rows = db::models::kanban::KanbanIssueCommentReaction::find_by_comment(pool, comment.id).await?;
-            reactions.extend(rows.into_iter().map(db_to_api_reaction));
-        }
+    for comment in comments {
+        let rows =
+            db::models::kanban::KanbanIssueCommentReaction::find_by_comment(pool, comment.id)
+                .await?;
+        reactions.extend(rows.into_iter().map(db_to_api_reaction));
     }
-    Ok(ResponseJson(ApiResponse::success(ListIssueCommentReactionsResponse { issue_comment_reactions: reactions })))
+    Ok(ResponseJson(ApiResponse::success(
+        ListIssueCommentReactionsResponse {
+            issue_comment_reactions: reactions,
+        },
+    )))
 }
 
 async fn fallback_workspaces(
@@ -363,21 +427,27 @@ async fn fallback_workspaces(
     let pool = &deployment.db().pool;
     let rows = db::models::kanban::KanbanWorkspace::find_by_project(pool, query.project_id).await?;
     let workspaces: Vec<Workspace> = rows.into_iter().map(db_to_api_workspace).collect();
-    Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "workspaces": workspaces }))))
+    Ok(ResponseJson(ApiResponse::success(
+        serde_json::json!({ "workspaces": workspaces }),
+    )))
 }
 
 async fn fallback_pull_requests(
     State(deployment): State<DeploymentImpl>,
     Query(query): Query<ProjectScopedFallbackQuery>,
 ) -> Result<ResponseJson<ApiResponse<serde_json::Value>>, ApiError> {
-    Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "pull_requests": [] }))))
+    Ok(ResponseJson(ApiResponse::success(
+        serde_json::json!({ "pull_requests": [] }),
+    )))
 }
 
 async fn fallback_pull_request_issues(
     State(deployment): State<DeploymentImpl>,
     Query(query): Query<ProjectScopedFallbackQuery>,
 ) -> Result<ResponseJson<ApiResponse<serde_json::Value>>, ApiError> {
-    Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "pull_request_issues": [] }))))
+    Ok(ResponseJson(ApiResponse::success(
+        serde_json::json!({ "pull_request_issues": [] }),
+    )))
 }
 
 async fn fallback_project_workspaces(
@@ -387,7 +457,9 @@ async fn fallback_project_workspaces(
     let pool = &deployment.db().pool;
     let rows = db::models::kanban::KanbanWorkspace::find_by_project(pool, query.project_id).await?;
     let workspaces: Vec<Workspace> = rows.into_iter().map(db_to_api_workspace).collect();
-    Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "workspaces": workspaces }))))
+    Ok(ResponseJson(ApiResponse::success(
+        serde_json::json!({ "workspaces": workspaces }),
+    )))
 }
 
 async fn fallback_user_workspaces(
@@ -412,23 +484,31 @@ async fn fallback_user_workspaces(
     .fetch_all(pool)
     .await?;
     let workspaces: Vec<Workspace> = rows.into_iter().map(db_to_api_workspace).collect();
-    Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "workspaces": workspaces }))))
+    Ok(ResponseJson(ApiResponse::success(
+        serde_json::json!({ "workspaces": workspaces }),
+    )))
 }
 
 async fn fallback_notifications(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<serde_json::Value>>, ApiError> {
-    Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "notifications": [] }))))
+    Ok(ResponseJson(ApiResponse::success(
+        serde_json::json!({ "notifications": [] }),
+    )))
 }
 
 async fn fallback_organization_members(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<serde_json::Value>>, ApiError> {
-    Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "organization_members": [] }))))
+    Ok(ResponseJson(ApiResponse::success(
+        serde_json::json!({ "organization_members": [] }),
+    )))
 }
 
 async fn fallback_users(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<serde_json::Value>>, ApiError> {
-    Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "users": [] }))))
+    Ok(ResponseJson(ApiResponse::success(
+        serde_json::json!({ "users": [] }),
+    )))
 }

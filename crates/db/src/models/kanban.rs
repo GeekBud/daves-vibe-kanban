@@ -49,7 +49,10 @@ impl KanbanOrganization {
         .await
     }
 
-    pub async fn create(pool: &SqlitePool, data: &CreateKanbanOrganization) -> Result<Self, sqlx::Error> {
+    pub async fn create(
+        pool: &SqlitePool,
+        data: &CreateKanbanOrganization,
+    ) -> Result<Self, sqlx::Error> {
         let id = Uuid::new_v4();
         let color = data.color.as_deref().unwrap_or("#6366f1");
         sqlx::query_as!(
@@ -123,7 +126,10 @@ pub struct UpdateKanbanProject {
 }
 
 impl KanbanProject {
-    pub async fn find_by_organization(pool: &SqlitePool, organization_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_organization(
+        pool: &SqlitePool,
+        organization_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanProject,
             r#"SELECT id as "id!: Uuid",
@@ -156,7 +162,10 @@ impl KanbanProject {
         .await
     }
 
-    pub async fn create(pool: &SqlitePool, data: &CreateKanbanProject) -> Result<Self, sqlx::Error> {
+    pub async fn create(
+        pool: &SqlitePool,
+        data: &CreateKanbanProject,
+    ) -> Result<Self, sqlx::Error> {
         let id = Uuid::new_v4();
         let color = data.color.as_deref().unwrap_or("#6366f1");
         sqlx::query_as!(
@@ -177,8 +186,14 @@ impl KanbanProject {
         .await
     }
 
-    pub async fn update(pool: &SqlitePool, id: Uuid, data: &UpdateKanbanProject) -> Result<Self, sqlx::Error> {
-        let existing = Self::find_by_id(pool, id).await?.ok_or(sqlx::Error::RowNotFound)?;
+    pub async fn update(
+        pool: &SqlitePool,
+        id: Uuid,
+        data: &UpdateKanbanProject,
+    ) -> Result<Self, sqlx::Error> {
+        let existing = Self::find_by_id(pool, id)
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)?;
         let name = data.name.as_ref().unwrap_or(&existing.name);
         let color = data.color.as_ref().unwrap_or(&existing.color);
         let sort_order = data.sort_order.unwrap_or(existing.sort_order);
@@ -202,9 +217,10 @@ impl KanbanProject {
     }
 
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {
-        let result: sqlx::sqlite::SqliteQueryResult = sqlx::query!("DELETE FROM kanban_projects WHERE id = $1", id)
-            .execute(pool)
-            .await?;
+        let result: sqlx::sqlite::SqliteQueryResult =
+            sqlx::query!("DELETE FROM kanban_projects WHERE id = $1", id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected())
     }
 }
@@ -234,7 +250,10 @@ pub struct CreateKanbanProjectStatus {
 }
 
 impl KanbanProjectStatus {
-    pub async fn find_by_project(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_project(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanProjectStatus,
             r#"SELECT id as "id!: Uuid",
@@ -251,7 +270,10 @@ impl KanbanProjectStatus {
         .await
     }
 
-    pub async fn create(pool: &SqlitePool, data: &CreateKanbanProjectStatus) -> Result<Self, sqlx::Error> {
+    pub async fn create(
+        pool: &SqlitePool,
+        data: &CreateKanbanProjectStatus,
+    ) -> Result<Self, sqlx::Error> {
         let id = Uuid::new_v4();
         let color = data.color.as_deref().unwrap_or("#6366f1");
         let hidden = data.hidden.unwrap_or(false);
@@ -295,7 +317,10 @@ pub struct CreateKanbanTag {
 }
 
 impl KanbanTag {
-    pub async fn find_by_project(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_project(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanTag,
             r#"SELECT id as "id!: Uuid",
@@ -330,9 +355,10 @@ impl KanbanTag {
     }
 
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {
-        let result: sqlx::sqlite::SqliteQueryResult = sqlx::query!("DELETE FROM kanban_tags WHERE id = $1", id)
-            .execute(pool)
-            .await?;
+        let result: sqlx::sqlite::SqliteQueryResult =
+            sqlx::query!("DELETE FROM kanban_tags WHERE id = $1", id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected())
     }
 }
@@ -397,7 +423,10 @@ pub struct UpdateKanbanIssue {
 }
 
 impl KanbanIssue {
-    pub async fn find_by_project(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_project(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanIssue,
             r#"SELECT id as "id!: Uuid",
@@ -449,20 +478,65 @@ impl KanbanIssue {
     pub async fn create(pool: &SqlitePool, data: &CreateKanbanIssue) -> Result<Self, sqlx::Error> {
         let id = Uuid::new_v4();
         let sort_order = data.sort_order.unwrap_or(0);
-        let extension_metadata = data.extension_metadata.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "{}".to_string());
+        let extension_metadata = data
+            .extension_metadata
+            .as_ref()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "{}".to_string());
         let description = data.description.as_deref();
         let priority = data.priority.as_deref();
         let start_date = data.start_date.as_deref();
         let target_date = data.target_date.as_deref();
         let completed_at = data.completed_at.as_deref();
-        // parent_issue_sort_order is Option<i64>, can be passed directly
+
+        let max_issue_number: Option<i64> = sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT MAX(issue_number) FROM kanban_issues WHERE project_id = ?",
+        )
+        .bind(data.project_id)
+        .fetch_one(pool)
+        .await?;
+        let issue_number = max_issue_number.unwrap_or(0) + 1;
+
+        let simple_id_prefix: Option<String> = sqlx::query_scalar::
+            <_, Option<String>>(
+                "SELECT simple_id FROM kanban_issues WHERE project_id = ? AND simple_id IS NOT NULL AND simple_id != '' LIMIT 1",
+            )
+            .bind(data.project_id)
+            .fetch_optional(pool)
+            .await?
+            .flatten()
+            .and_then(|s| s.split('-').next().map(|p| p.to_string()));
+
+        let prefix = match simple_id_prefix {
+            Some(p) => p,
+            None => {
+                let project_name: Option<String> = sqlx::query_scalar::<_, Option<String>>(
+                    "SELECT name FROM kanban_projects WHERE id = ?",
+                )
+                .bind(data.project_id)
+                .fetch_optional(pool)
+                .await?
+                .flatten();
+                project_name
+                    .map(|name: String| {
+                        name.split(|c: char| !c.is_alphanumeric())
+                            .filter(|s: &&str| !s.is_empty())
+                            .filter_map(|s: &str| s.chars().next())
+                            .map(|c: char| c.to_ascii_uppercase())
+                            .collect::<String>()
+                    })
+                    .unwrap_or_else(|| "ISS".to_string())
+            }
+        };
+        let simple_id = format!("{}-{}", prefix, issue_number);
+
         sqlx::query_as!(
             KanbanIssue,
             r#"INSERT INTO kanban_issues (
-                   id, project_id, status_id, title, description, priority,
+                   id, project_id, status_id, issue_number, simple_id, title, description, priority,
                    start_date, target_date, completed_at, sort_order,
                    parent_issue_id, parent_issue_sort_order, extension_metadata, creator_user_id
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                RETURNING id as "id!: Uuid",
                          project_id as "project_id!: Uuid",
                          issue_number, simple_id,
@@ -479,6 +553,8 @@ impl KanbanIssue {
             id,
             data.project_id,
             data.status_id,
+            issue_number,
+            simple_id,
             data.title,
             description,
             priority,
@@ -495,19 +571,64 @@ impl KanbanIssue {
         .await
     }
 
-    pub async fn update(pool: &SqlitePool, id: Uuid, data: &UpdateKanbanIssue) -> Result<Self, sqlx::Error> {
-        let existing = Self::find_by_id(pool, id).await?.ok_or(sqlx::Error::RowNotFound)?;
+    pub async fn update(
+        pool: &SqlitePool,
+        id: Uuid,
+        data: &UpdateKanbanIssue,
+    ) -> Result<Self, sqlx::Error> {
+        let existing = Self::find_by_id(pool, id)
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)?;
         let status_id = data.status_id.unwrap_or(existing.status_id);
         let title = data.title.as_ref().unwrap_or(&existing.title);
-        let description = data.description.as_ref().map(|v| v.as_deref()).flatten().or(existing.description.as_deref());
-        let priority = data.priority.as_ref().map(|v| v.as_deref()).flatten().or(existing.priority.as_deref());
-        let start_date = data.start_date.as_ref().map(|v| v.as_deref()).flatten().or(existing.start_date.as_deref());
-        let target_date = data.target_date.as_ref().map(|v| v.as_deref()).flatten().or(existing.target_date.as_deref());
-        let completed_at = data.completed_at.as_ref().map(|v| v.as_deref()).flatten().or(existing.completed_at.as_deref());
+        let description = data
+            .description
+            .as_ref()
+            .map(|v| v.as_deref())
+            .flatten()
+            .or(existing.description.as_deref());
+        let priority = data
+            .priority
+            .as_ref()
+            .map(|v| v.as_deref())
+            .flatten()
+            .or(existing.priority.as_deref());
+        let start_date = data
+            .start_date
+            .as_ref()
+            .map(|v| v.as_deref())
+            .flatten()
+            .or(existing.start_date.as_deref());
+        let target_date = data
+            .target_date
+            .as_ref()
+            .map(|v| v.as_deref())
+            .flatten()
+            .or(existing.target_date.as_deref());
+        let completed_at = data
+            .completed_at
+            .as_ref()
+            .map(|v| v.as_deref())
+            .flatten()
+            .or(existing.completed_at.as_deref());
         let sort_order = data.sort_order.unwrap_or(existing.sort_order);
-        let parent_issue_id = data.parent_issue_id.as_ref().map(|v| *v).flatten().or(existing.parent_issue_id);
-        let parent_issue_sort_order: Option<i64> = data.parent_issue_sort_order.as_ref().map(|v| *v).flatten().or(existing.parent_issue_sort_order);
-        let extension_metadata = data.extension_metadata.as_ref().map(|v| v.to_string()).unwrap_or(existing.extension_metadata);
+        let parent_issue_id = data
+            .parent_issue_id
+            .as_ref()
+            .map(|v| *v)
+            .flatten()
+            .or(existing.parent_issue_id);
+        let parent_issue_sort_order: Option<i64> = data
+            .parent_issue_sort_order
+            .as_ref()
+            .map(|v| *v)
+            .flatten()
+            .or(existing.parent_issue_sort_order);
+        let extension_metadata = data
+            .extension_metadata
+            .as_ref()
+            .map(|v| v.to_string())
+            .unwrap_or(existing.extension_metadata);
         let description = description; // already Option<&str>
         let priority = priority;
         let start_date = start_date;
@@ -552,9 +673,10 @@ impl KanbanIssue {
     }
 
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {
-        let result: sqlx::sqlite::SqliteQueryResult = sqlx::query!("DELETE FROM kanban_issues WHERE id = $1", id)
-            .execute(pool)
-            .await?;
+        let result: sqlx::sqlite::SqliteQueryResult =
+            sqlx::query!("DELETE FROM kanban_issues WHERE id = $1", id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected())
     }
 }
@@ -572,7 +694,10 @@ pub struct KanbanIssueAssignee {
 }
 
 impl KanbanIssueAssignee {
-    pub async fn find_by_issue(pool: &SqlitePool, issue_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_issue(
+        pool: &SqlitePool,
+        issue_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanIssueAssignee,
             r#"SELECT id as "id!: Uuid",
@@ -599,7 +724,10 @@ pub struct KanbanIssueTag {
 }
 
 impl KanbanIssueTag {
-    pub async fn find_by_issue(pool: &SqlitePool, issue_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_issue(
+        pool: &SqlitePool,
+        issue_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanIssueTag,
             r#"SELECT id as "id!: Uuid",
@@ -628,7 +756,10 @@ pub struct KanbanIssueRelationship {
 }
 
 impl KanbanIssueRelationship {
-    pub async fn find_by_issue(pool: &SqlitePool, issue_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_issue(
+        pool: &SqlitePool,
+        issue_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanIssueRelationship,
             r#"SELECT id as "id!: Uuid",
@@ -662,7 +793,10 @@ pub struct KanbanIssueComment {
 }
 
 impl KanbanIssueComment {
-    pub async fn find_by_issue(pool: &SqlitePool, issue_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_issue(
+        pool: &SqlitePool,
+        issue_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanIssueComment,
             r#"SELECT id as "id!: Uuid",
@@ -693,7 +827,10 @@ pub struct KanbanIssueFollower {
 }
 
 impl KanbanIssueFollower {
-    pub async fn find_by_issue(pool: &SqlitePool, issue_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_issue(
+        pool: &SqlitePool,
+        issue_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanIssueFollower,
             r#"SELECT id as "id!: Uuid",
@@ -722,7 +859,10 @@ pub struct KanbanIssueCommentReaction {
 }
 
 impl KanbanIssueCommentReaction {
-    pub async fn find_by_comment(pool: &SqlitePool, comment_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_comment(
+        pool: &SqlitePool,
+        comment_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanIssueCommentReaction,
             r#"SELECT id as "id!: Uuid",
@@ -760,8 +900,24 @@ pub struct KanbanWorkspace {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Deserialize, TS)]
+pub struct CreateKanbanWorkspace {
+    pub project_id: Uuid,
+    pub owner_user_id: Uuid,
+    pub issue_id: Option<Uuid>,
+    pub local_workspace_id: Option<Uuid>,
+    pub name: Option<String>,
+    pub archived: bool,
+    pub files_changed: Option<i64>,
+    pub lines_added: Option<i64>,
+    pub lines_removed: Option<i64>,
+}
+
 impl KanbanWorkspace {
-    pub async fn find_by_project(pool: &SqlitePool, project_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_by_project(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             KanbanWorkspace,
             r#"SELECT id as "id!: Uuid",
@@ -780,6 +936,54 @@ impl KanbanWorkspace {
             project_id
         )
         .fetch_all(pool)
+        .await
+    }
+
+    pub async fn create_or_replace(
+        pool: &SqlitePool,
+        data: &CreateKanbanWorkspace,
+    ) -> Result<Self, sqlx::Error> {
+        let id = Uuid::new_v4();
+        let archived = data.archived as i64;
+        sqlx::query_as!(
+            KanbanWorkspace,
+            r#"INSERT INTO kanban_workspaces (
+                    id, project_id, owner_user_id, issue_id, local_workspace_id,
+                    name, archived, files_changed, lines_added, lines_removed,
+                    created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, datetime('now', 'subsec'), datetime('now', 'subsec'))
+                ON CONFLICT(local_workspace_id) DO UPDATE SET
+                    project_id = excluded.project_id,
+                    owner_user_id = excluded.owner_user_id,
+                    issue_id = excluded.issue_id,
+                    name = excluded.name,
+                    archived = excluded.archived,
+                    files_changed = excluded.files_changed,
+                    lines_added = excluded.lines_added,
+                    lines_removed = excluded.lines_removed,
+                    updated_at = datetime('now', 'subsec')
+                RETURNING id as "id!: Uuid",
+                          project_id as "project_id!: Uuid",
+                          owner_user_id as "owner_user_id!: Uuid",
+                          issue_id as "issue_id: Uuid",
+                          local_workspace_id as "local_workspace_id: Uuid",
+                          name,
+                          archived as "archived!: bool",
+                          files_changed, lines_added, lines_removed,
+                          created_at as "created_at!: DateTime<Utc>",
+                          updated_at as "updated_at!: DateTime<Utc>""#,
+            id,
+            data.project_id,
+            data.owner_user_id,
+            data.issue_id,
+            data.local_workspace_id,
+            data.name,
+            archived,
+            data.files_changed,
+            data.lines_added,
+            data.lines_removed,
+        )
+        .fetch_one(pool)
         .await
     }
 }
