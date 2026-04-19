@@ -20,7 +20,7 @@ pub fn router() -> Router<DeploymentImpl> {
     Router::new()
         .route("/issues", get(list_issues).post(create_issue))
         .route("/issues/search", post(search_issues))
-        .route("/issues/{issue_id}", get(get_issue).post(update_issue))
+        .route("/issues/{issue_id}", get(get_issue).post(update_issue).delete(delete_issue))
         .route("/issues/bulk", post(bulk_update_issues))
 }
 
@@ -195,4 +195,13 @@ async fn bulk_update_issues(
         db::models::kanban::KanbanIssue::update(pool, item.id, &data).await?;
     }
     Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "txid": 1 }))))
+}
+
+async fn delete_issue(
+    State(deployment): State<DeploymentImpl>,
+    Path(issue_id): Path<Uuid>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    let pool = &deployment.db().pool;
+    db::models::kanban::KanbanIssue::delete(pool, issue_id).await?;
+    Ok(ResponseJson(ApiResponse::success(())))
 }

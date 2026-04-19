@@ -19,8 +19,7 @@ use super::fallback::db_to_api_project;
 pub fn router() -> Router<DeploymentImpl> {
     Router::new()
         .route("/projects", get(list_projects).post(create_project))
-        .route("/projects/{project_id}", get(get_project))
-        .route("/projects/{project_id}", post(update_project))
+        .route("/projects/{project_id}", get(get_project).post(update_project).delete(delete_project))
         .route("/projects/bulk", post(bulk_update_projects))
 }
 
@@ -115,4 +114,13 @@ async fn bulk_update_projects(
         db::models::kanban::KanbanProject::update(pool, item.id, &data).await?;
     }
     Ok(ResponseJson(ApiResponse::success(serde_json::json!({ "txid": 1 }))))
+}
+
+async fn delete_project(
+    State(deployment): State<DeploymentImpl>,
+    Path(project_id): Path<Uuid>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    let pool = &deployment.db().pool;
+    db::models::kanban::KanbanProject::delete(pool, project_id).await?;
+    Ok(ResponseJson(ApiResponse::success(())))
 }

@@ -296,6 +296,14 @@ impl KanbanProjectStatus {
         .fetch_one(pool)
         .await
     }
+
+    pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {
+        let result: sqlx::sqlite::SqliteQueryResult =
+            sqlx::query!("DELETE FROM kanban_project_statuses WHERE id = $1", id)
+                .execute(pool)
+                .await?;
+        Ok(result.rows_affected())
+    }
 }
 
 // =============================================================================
