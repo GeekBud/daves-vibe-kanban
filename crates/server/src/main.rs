@@ -40,17 +40,39 @@ async fn main() -> Result<(), VibeKanbanError> {
     sentry_utils::init_once(SentrySource::Backend);
 
     let cfg = load_config();
-    let log_level = resolve_string(cfg.logging.rust_log.as_deref(), "RUST_LOG")
+    // VK_LOG_LEVEL > RUST_LOG > config file > default "info"
+    let log_level = resolve_string(cfg.logging.rust_log.as_deref(), "VK_LOG_LEVEL")
+        .or_else(|| std::env::var("RUST_LOG").ok().filter(|s| !s.is_empty()))
         .unwrap_or_else(|| "info".to_string());
+    let is_debug = log_level.eq_ignore_ascii_case("debug");
+
     let filter_string = format!(
-        "warn,server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level},embedded_ssh={level},desktop_bridge={level},relay_hosts={level},relay_client={level},relay_webrtc={level},codex_core=off",
+        "{level},server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level},embedded_ssh={level},desktop_bridge={level},relay_hosts={level},relay_client={level},relay_webrtc={level},codex_core=off",
         level = log_level
     );
     let env_filter = EnvFilter::try_new(filter_string).expect("Failed to create tracing filter");
-    tracing_subscriber::registry()
+
+    let registry = tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
-        .with(sentry_layer())
-        .init();
+        .with(sentry_layer());
+
+    // File logging to /tmp/vibe-kanban.log only when VK_LOG_LEVEL=debug
+    if is_debug {
+        let log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/vibe-kanban.log")
+            .expect("Failed to open log file at /tmp/vibe-kanban.log");
+        let (non_blocking, _guard) = tracing_appender::non_blocking(log_file);
+        std::mem::forget(_guard);
+        registry
+            .with(tracing_subscriber::fmt::layer().with_writer(non_blocking).with_filter(
+                EnvFilter::try_new("debug").expect("Failed to create file tracing filter"),
+            ))
+            .init();
+    } else {
+        registry.init();
+    }
 
     // Create asset directory if it doesn't exist
     if !asset_dir().exists() {

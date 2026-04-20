@@ -60,7 +60,8 @@ pub enum KimiContentBlock {
 /// Kimi tool call structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KimiToolCall {
-    #[serde(rename = "type")]
+    /// Kimi 1.36.0+ uses "call_type" in stream-json output; older versions used "type"
+    #[serde(rename = "type", alias = "call_type")]
     pub call_type: String,
     pub id: String,
     pub function: KimiFunctionCall,
@@ -761,10 +762,12 @@ impl StandardCodingAgentExecutor for KimiCode {
                                 // Add as a tool result entry with proper tool_use type
                                 let idx = entry_index_provider.next();
                                 let display_text = if content_text.len() > 500 {
+                                    let truncated: String =
+                                        content_text.chars().take(500).collect();
                                     format!(
                                         "{}... [{} more chars]",
-                                        &content_text[..500],
-                                        content_text.len() - 500
+                                        truncated,
+                                        content_text.len() - truncated.len()
                                     )
                                 } else {
                                     content_text.clone()
@@ -993,5 +996,138 @@ mod tests {
             ParsedKimiEvent::Message(msg) => assert!(matches!(msg.role, KimiRole::Assistant)),
             _ => panic!("Expected Message event"),
         }
+
+        // Test tool_calls with "call_type" field (Kimi 1.36.0+ format)
+        let json_with_call_type = r#"{"role":"assistant","content":[{"type":"think","think":"冲突已解决。","encrypted":null}],"tool_calls":[{"call_type":"function","id":"call_123","function":{"name":"Shell","arguments":"{}"}}],"tool_call_id":null}"#;
+        let msg_call_type = serde_json::from_str::<KimiMessage>(json_with_call_type).unwrap();
+        assert_eq!(msg_call_type.tool_calls.len(), 1);
+        assert_eq!(msg_call_type.tool_calls[0].call_type, "function");
+        assert_eq!(msg_call_type.tool_calls[0].function.name, "Shell");
+    }
+
+    #[tokio::test]
+    async fn test_kimi_normalize_logs_produces_assistant_message() {
+        use crate::executors::StandardCodingAgentExecutor;
+        use tokio::time::{sleep, Duration};
+        let msg_store = Arc::new(MsgStore::new());
+
+        // Simulate the user's actual JSON sequence from Kimi 1.36.0
+        let lines = vec![
+            r#"{"role":"assistant","content":[{"type":"think","think":"冲突已解决。现在需要添加文件并完成 merge commit。","encrypted":null}],"tool_calls":[{"call_type":"function","id":"call_41c36c5e-aab2-4b30-81e5-1d62a5d3cab6","function":{"name":"Shell","arguments":"{\"command\":\"cd moyi-recommend && git add -A && git status\"}"}}],"tool_call_id":null}"#,
+            r#"{"role":"tool","content":[{"type":"text","text":"<system>Command executed successfully.</system>\n<output>On branch vk/c106-moyi-recommend-m...nothing to commit, working tree clean</output>"}],"tool_call_id":"call_41c36c5e-aab2-4b30-81e5-1d62a5d3cab6"}"#,
+            r#"{"role":"assistant","content":[{"type":"think","think":"merge 中有很多 origin/master 带来的新文件和修改，这是正常的。我需要完成 merge commit。\n\n冲突已经解决了（NydusTopics.java），现在只需要 `git commit` 完成 merge。","encrypted":null}],"tool_calls":[{"call_type":"function","id":"call_44177423-b62a-4653-b61e-4ca81f6c1665","function":{"name":"Shell","arguments":"{\"command\":\"cd moyi-recommend && git commit -m \\\"Merge origin/master into vk/c106-moyi-recommend-m\\\"\"}"}}],"tool_call_id":null}"#,
+            r#"{"role":"tool","content":[{"type":"text","text":"<system>Command executed successfully.</system>\n<output>[vk/c106-moyi-recommend-m 64578ec] Merge origin/master into vk/c106-moyi-recommend-m</output>"}],"tool_call_id":"call_44177423-b62a-4653-b61e-4ca81f6c1665"}"#,
+            r#"{"role":"assistant","content":[{"type":"think","think":"Merge 已成功完成。当前分支 `vk/c106-moyi-recommend-m` 现在已经基于最新的 `origin/master` 了。\n\n让我给用户一个简洁的总结。","encrypted":null}],"tool_calls":[],"tool_call_id":null}"#,
+            r#"{"role":"assistant","content":[{"type":"text","text":"Merge 已完成。当前分支 `vk/c106-moyi-recommend-m` 现已基于最新的 `origin/master`（`c9750907f`）。\n\n**冲突情况**：仅 `NydusTopics.java` 一处冲突，位于 `moyi-recommend` 目录下，已按 origin/master 的版本自动解决（保留了你的修改）。\n\n**当前状态**：\n- 所有更改已暂存（`git add -A`）\n- 工作树干净（`nothing to commit, working tree clean`）\n- 分支 `vk/c106-moyi-recommend-m` 已基于 `origin/master`"}],"tool_calls":[],"tool_call_id":null}"#,
+        ];
+
+        for line in &lines {
+            msg_store.push_stdout(format!("{line}\n"));
+        }
+        msg_store.push_finished();
+
+        let executor = KimiCode {
+            append_prompt: AppendPrompt(None),
+            model: None,
+            yolo: None,
+            thinking: None,
+            cmd: CmdOverrides::default(),
+            approvals: None,
+            session_id: Arc::new(Mutex::new(Some("test-session".to_string()))),
+        };
+
+        let handles = executor.normalize_logs(msg_store.clone(), Path::new("/tmp"));
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        // Allow a brief moment for any final patches to be applied
+        sleep(Duration::from_millis(100)).await;
+
+        let history = msg_store.get_history();
+        let patches: Vec<_> = history.iter().filter_map(|m| match m {
+            workspace_utils::log_msg::LogMsg::JsonPatch(p) => Some(p),
+            _ => None,
+        }).collect();
+
+        // Count entry types in patches
+        let mut assistant_msg_count = 0;
+        let mut thinking_count = 0;
+        let mut tool_use_count = 0;
+        let mut assistant_content = String::new();
+
+        for patch in &patches {
+            if let Some((_, entry)) = crate::logs::utils::patch::extract_normalized_entry_from_patch(patch) {
+                match entry.entry_type {
+                    NormalizedEntryType::AssistantMessage => {
+                        assistant_msg_count += 1;
+                        assistant_content = entry.content;
+                    }
+                    NormalizedEntryType::Thinking => thinking_count += 1,
+                    NormalizedEntryType::ToolUse { .. } => tool_use_count += 1,
+                    _ => {}
+                }
+            }
+        }
+
+        assert!(thinking_count >= 2, "Expected at least 2 thinking entries, got {}", thinking_count);
+        assert!(tool_use_count >= 2, "Expected at least 2 tool_use entries, got {}", tool_use_count);
+        assert_eq!(assistant_msg_count, 1, "Expected exactly 1 assistant_message, got {}", assistant_msg_count);
+        assert!(assistant_content.contains("Merge 已完成"), "Assistant message should contain the final summary, got: {}", assistant_content);
+    }
+
+    #[tokio::test]
+    async fn test_replay_from_actual_log_file() {
+        let log_path = "/Users/lianghusile/dave/appData/daves-vibe-kanban/sessions/b5/b5553ef9-982e-4365-b1ac-15f5adabeac7/processes/55d38259-dded-41be-88d8-0f6fe9d154f8.jsonl";
+        let content = tokio::fs::read_to_string(log_path).await.unwrap();
+
+        let msg_store = Arc::new(MsgStore::new());
+        for line in content.lines() {
+            if line.trim().is_empty() { continue; }
+            let msg: workspace_utils::log_msg::LogMsg = serde_json::from_str(line).unwrap();
+            msg_store.push(msg);
+        }
+        msg_store.push_finished();
+
+        let executor = KimiCode {
+            append_prompt: AppendPrompt(None),
+            model: None,
+            yolo: None,
+            thinking: None,
+            cmd: CmdOverrides::default(),
+            approvals: None,
+            session_id: Arc::new(Mutex::new(Some("test-session".to_string()))),
+        };
+
+        let handles = executor.normalize_logs(msg_store.clone(), Path::new("/tmp"));
+        for handle in handles {
+            handle.await.unwrap();
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let history = msg_store.get_history();
+        let patches: Vec<_> = history.iter().filter_map(|m| match m {
+            workspace_utils::log_msg::LogMsg::JsonPatch(p) => Some(p),
+            _ => None,
+        }).collect();
+
+        let mut assistant_count = 0;
+        let mut thinking_count = 0;
+        let mut tool_use_count = 0;
+
+        for patch in &patches {
+            if let Some((_, entry)) = crate::logs::utils::patch::extract_normalized_entry_from_patch(patch) {
+                match entry.entry_type {
+                    NormalizedEntryType::AssistantMessage => assistant_count += 1,
+                    NormalizedEntryType::Thinking => thinking_count += 1,
+                    NormalizedEntryType::ToolUse { .. } => tool_use_count += 1,
+                    _ => {}
+                }
+            }
+        }
+
+        println!("REPLAY RESULT: patches={} assistant={} thinking={} tool_use={}", patches.len(), assistant_count, thinking_count, tool_use_count);
+
+        assert!(assistant_count >= 1, "Expected at least 1 assistant message, got {}", assistant_count);
     }
 }

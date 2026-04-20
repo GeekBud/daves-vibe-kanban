@@ -1520,12 +1520,40 @@ async fn process_event_stream(
                             )
                             .await;
 
-                            let _ = client
+                            let resp = client
                                 .post(format!("{base_url}/permission/{request_id}/reply"))
                                 .query(&[("directory", directory.as_str())])
                                 .json(&serde_json::json!({ "reply": "once" }))
                                 .send()
                                 .await;
+                            match resp {
+                                Ok(resp) if !resp.status().is_success() => {
+                                    let status = resp.status();
+                                    let body = resp.text().await.unwrap_or_default();
+                                    let truncated: String =
+                                        body.chars().take(400).collect::<String>();
+                                    tracing::warn!(
+                                        "OpenCode auto-permission reply failed request_id={} status={} body={}",
+                                        request_id,
+                                        status,
+                                        truncated
+                                    );
+                                }
+                                Ok(_) => {
+                                    tracing::debug!(
+                                        "OpenCode auto-permission reply succeeded request_id={}",
+                                        request_id
+                                    );
+                                }
+                                Err(err) => {
+                                    let is_timeout = err.is_timeout();
+                                    tracing::warn!(
+                                        "OpenCode auto-permission reply error request_id={} timeout={}: {err}",
+                                        request_id,
+                                        is_timeout
+                                    );
+                                }
+                            }
                             let _ = done_tx.send(());
                             return;
                         }
@@ -1610,12 +1638,40 @@ async fn process_event_stream(
                         serde_json::json!({ "reply": reply })
                     };
 
-                    let _ = client
+                    let resp = client
                         .post(format!("{base_url}/permission/{request_id}/reply"))
                         .query(&[("directory", directory.as_str())])
                         .json(&payload)
                         .send()
                         .await;
+                    match resp {
+                        Ok(resp) if !resp.status().is_success() => {
+                            let status = resp.status();
+                            let body = resp.text().await.unwrap_or_default();
+                            let truncated: String =
+                                body.chars().take(400).collect::<String>();
+                            tracing::warn!(
+                                "OpenCode permission reply failed request_id={} status={} body={}",
+                                request_id,
+                                status,
+                                truncated
+                            );
+                        }
+                        Ok(_) => {
+                            tracing::debug!(
+                                "OpenCode permission reply succeeded request_id={}",
+                                request_id
+                            );
+                        }
+                        Err(err) => {
+                            let is_timeout = err.is_timeout();
+                            tracing::warn!(
+                                "OpenCode permission reply error request_id={} timeout={}: {err}",
+                                request_id,
+                                is_timeout
+                            );
+                        }
+                    }
 
                     let _ = done_tx.send(());
                 });
