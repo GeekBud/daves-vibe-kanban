@@ -40,7 +40,7 @@ pub enum KimiRole {
     System,
     #[serde(other)]
     Unknown,
-}
+} // FORK-MOD-007: Added Unknown fallback for robust parsing
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -60,7 +60,7 @@ pub enum KimiContentBlock {
 /// Kimi tool call structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KimiToolCall {
-    /// Kimi 1.36.0+ uses "call_type" in stream-json output; older versions used "type"
+    // FORK-MOD-011: Kimi 1.36.0+ uses "call_type" in stream-json output; older versions used "type"
     #[serde(rename = "type", alias = "call_type")]
     pub call_type: String,
     pub id: String,
@@ -108,8 +108,8 @@ fn parse_kimi_line(line: &str) -> Option<ParsedKimiEvent> {
         return Some(ParsedKimiEvent::Message(msg));
     }
 
-    // Best-effort fallback for role-based messages that fail strict KimiMessage
-    // parsing (e.g. due to unknown content block types or new roles in newer CLI)
+    // FORK-MOD-007: Best-effort fallback for role-based messages that fail strict
+    // KimiMessage parsing (e.g. unknown content block types or new roles in newer CLI)
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
         if let Some(role_str) = value.get("role").and_then(|v| v.as_str()) {
             let role = match role_str {
@@ -191,7 +191,7 @@ fn parse_kimi_line(line: &str) -> Option<ParsedKimiEvent> {
             }));
         }
 
-        // Handle new event-based formats (Thought, Message, ToolCall, etc.)
+        // FORK-MOD-006: Handle new event-based formats (Thought, Message, ToolCall, etc.)
         // Handle Thought {"Thought": {"type": "text", "text": "..."}}
         if let Some(thought) = value.get("Thought") {
             if let Some(text) = thought.get("text").and_then(|v| v.as_str()) {
@@ -298,6 +298,53 @@ fn parse_kimi_line(line: &str) -> Option<ParsedKimiEvent> {
 
     // Treat as raw output if not recognized
     Some(ParsedKimiEvent::RawLog(line.to_string()))
+}
+
+// FORK-MOD-012: Truncate tool result display text without allocating full large strings.
+// When Kimi returns very long tool outputs (e.g. large shell command results),
+// we only need the first 500 chars for display. This avoids O(n) allocation of
+// multi-megabyte strings that are immediately discarded.
+fn truncate_tool_result(content: &KimiContent) -> String {
+    const MAX_CHARS: usize = 500;
+    match content {
+        KimiContent::Text(text) => {
+            let mut count = 0;
+            let mut truncated = String::new();
+            for ch in text.chars() {
+                if count < MAX_CHARS {
+                    truncated.push(ch);
+                }
+                count += 1;
+            }
+            if count > MAX_CHARS {
+                format!("{}... [{} more chars]", truncated, count - MAX_CHARS)
+            } else {
+                truncated
+            }
+        }
+        KimiContent::Blocks(blocks) => {
+            let mut count = 0;
+            let mut truncated = String::new();
+            for block in blocks {
+                let text = match block {
+                    KimiContentBlock::Text { text } => text.as_str(),
+                    KimiContentBlock::Think { think, .. } => think.as_str(),
+                    KimiContentBlock::Unknown => continue,
+                };
+                for ch in text.chars() {
+                    if count < MAX_CHARS {
+                        truncated.push(ch);
+                    }
+                    count += 1;
+                }
+            }
+            if count > MAX_CHARS {
+                format!("{}... [{} more chars]", truncated, count - MAX_CHARS)
+            } else {
+                truncated
+            }
+        }
+    }
 }
 
 /// Parse tool arguments JSON into action type
@@ -625,11 +672,13 @@ impl StandardCodingAgentExecutor for KimiCode {
                                 for block in content_blocks {
                                     match block {
                                         KimiContentBlock::Think { think, .. } => {
-                                            // Skip thinking blocks that just describe tool calls
-                                            // if they are followed by actual tool_calls
-                                            let should_skip = !msg.tool_calls.is_empty()
-                                                && think.len() >= 100
-                                                && think.contains("tool");
+                                            // FORK-MOD-007: Skip thinking blocks that just describe
+                                        // tool calls if they are followed by actual tool_calls.
+                                        // Previous logic was inverted, showing useless tool-call
+                                        // planning thoughts in the UI.
+                                        let should_skip = !msg.tool_calls.is_empty()
+                                            && think.len() >= 100
+                                            && think.contains("tool");
                                             if !should_skip {
                                                 current_message = None;
                                                 message_index = None;
@@ -738,18 +787,10 @@ impl StandardCodingAgentExecutor for KimiCode {
                                 }
                             }
                             KimiRole::Tool => {
-                                // Tool result - extract from content (handles string or array)
-                                let content_text: String = match &msg.content {
-                                    KimiContent::Text(text) => text.clone(),
-                                    KimiContent::Blocks(blocks) => blocks
-                                        .iter()
-                                        .map(|c| match c {
-                                            KimiContentBlock::Text { text } => text.clone(),
-                                            KimiContentBlock::Think { think, .. } => think.clone(),
-                                            KimiContentBlock::Unknown => String::new(),
-                                        })
-                                        .collect(),
-                                };
+                                // FORK-MOD-012: Avoid O(n) allocation of full large strings.
+                                // Tool results from Shell/Grep/etc. can be multi-MB; we only need
+                                // first 500 chars for display.
+                                let display_text = truncate_tool_result(&msg.content);
 
                                 // Find matching tool call if any (using first pending as approximation)
                                 // Kimi doesn't consistently link tool results to calls via ID in the stream
@@ -761,17 +802,6 @@ impl StandardCodingAgentExecutor for KimiCode {
 
                                 // Add as a tool result entry with proper tool_use type
                                 let idx = entry_index_provider.next();
-                                let display_text = if content_text.len() > 500 {
-                                    let truncated: String =
-                                        content_text.chars().take(500).collect();
-                                    format!(
-                                        "{}... [{} more chars]",
-                                        truncated,
-                                        content_text.len() - truncated.len()
-                                    )
-                                } else {
-                                    content_text.clone()
-                                };
 
                                 let entry = NormalizedEntry {
                                     timestamp: None,
@@ -1129,5 +1159,53 @@ mod tests {
         println!("REPLAY RESULT: patches={} assistant={} thinking={} tool_use={}", patches.len(), assistant_count, thinking_count, tool_use_count);
 
         assert!(assistant_count >= 1, "Expected at least 1 assistant message, got {}", assistant_count);
+    }
+
+    #[test]
+    fn test_truncate_tool_result_short() {
+        let content = KimiContent::Text("Hello world".to_string());
+        assert_eq!(truncate_tool_result(&content), "Hello world");
+    }
+
+    #[test]
+    fn test_truncate_tool_result_exact_500() {
+        let text = "a".repeat(500);
+        let content = KimiContent::Text(text.clone());
+        assert_eq!(truncate_tool_result(&content), text);
+    }
+
+    #[test]
+    fn test_truncate_tool_result_long() {
+        let text = "x".repeat(1000);
+        let content = KimiContent::Text(text);
+        let result = truncate_tool_result(&content);
+        assert!(result.starts_with("x"), "Should start with x");
+        assert!(result.ends_with("... [500 more chars]"), "Should indicate truncation: got {}", result);
+        // Count visible chars before "..."
+        let prefix_len = result.find("...").unwrap();
+        assert_eq!(prefix_len, 500, "Should have 500 visible chars");
+    }
+
+    #[test]
+    fn test_truncate_tool_result_blocks() {
+        let blocks = vec![
+            KimiContentBlock::Text { text: "Hello ".to_string() },
+            KimiContentBlock::Think { think: "world".to_string(), encrypted: None },
+        ];
+        let content = KimiContent::Blocks(blocks);
+        assert_eq!(truncate_tool_result(&content), "Hello world");
+    }
+
+    #[test]
+    fn test_truncate_tool_result_blocks_long() {
+        let blocks = vec![
+            KimiContentBlock::Text { text: "a".repeat(300) },
+            KimiContentBlock::Text { text: "b".repeat(300) },
+            KimiContentBlock::Text { text: "c".repeat(300) },
+        ];
+        let content = KimiContent::Blocks(blocks);
+        let result = truncate_tool_result(&content);
+        assert!(result.starts_with("a"), "Should start with a");
+        assert!(result.ends_with("... [400 more chars]"), "Should indicate 400 more chars: got {}", result);
     }
 }

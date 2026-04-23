@@ -40,7 +40,7 @@ async fn main() -> Result<(), VibeKanbanError> {
     sentry_utils::init_once(SentrySource::Backend);
 
     let cfg = load_config();
-    // VK_LOG_LEVEL > RUST_LOG > config file > default "info"
+    // FORK-MOD-011: VK_LOG_LEVEL > RUST_LOG > config file > default "info"
     let log_level = resolve_string(cfg.logging.rust_log.as_deref(), "VK_LOG_LEVEL")
         .or_else(|| std::env::var("RUST_LOG").ok().filter(|s| !s.is_empty()))
         .unwrap_or_else(|| "info".to_string());
