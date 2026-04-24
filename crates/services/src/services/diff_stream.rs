@@ -195,10 +195,16 @@ pub async fn create(args: DiffStreamArgs) -> Result<DiffStreamHandle, DiffStream
 
     let watcher_task = tokio::spawn(async move {
         let mut manager = DiffStreamManager::new(manager_args, tx);
-        if let Err(e) = manager.run().await {
+        let run_result = manager.run().await;
+        if let Err(e) = run_result {
             tracing::warn!("Diff stream ended: {e}");
             let _ = manager.tx.send(Err(io::Error::other(e.to_string()))).await;
         }
+        // Always emit Finished when the watcher loop terminates so frontend
+        // consumers never wait forever. Without this, any error path in
+        // `run()` (or a clean break) leaves `useDiffStream` permanently in
+        // `loading=true`.
+        let _ = manager.tx.send(Ok(LogMsg::Finished)).await;
     });
 
     Ok(DiffStreamHandle::new(
