@@ -78,6 +78,15 @@ fn build_gitignore_set(root: &Path) -> Result<Gitignore, FilesystemWatcherError>
                 return false;
             }
 
+            // FORK-MOD-016: skip directory symlinks. The fork's
+            // `.vibe-init.sh` populates worktrees with `ln -sf` shortcuts
+            // pointing back to the canonical repos and `.claude/` tree;
+            // descending into them blows up the watcher and causes git
+            // verify_path failures downstream.
+            if is_dir && entry.path_is_symlink() {
+                return false;
+            }
+
             // only recurse into directories and .gitignore files
             is_dir
                 || entry
@@ -313,6 +322,14 @@ fn collect_watch_directories(root: &Path, gi: &Gitignore) -> Vec<WatchTarget> {
                 return false;
             }
 
+            // FORK-MOD-016: skip directory symlinks (see build_gitignore_set
+            // for rationale). Without this we end up registering watches on
+            // `.claude -> /Users/.../repo-work/.claude` and ~100 sub-repo
+            // symlinks per workspace.
+            if entry.path_is_symlink() {
+                return false;
+            }
+
             true
         })
         .build()
@@ -410,6 +427,16 @@ fn add_directory_watch(
     gi: &Gitignore,
     canonical_root: &Path,
 ) {
+    // FORK-MOD-016: skip directory symlinks dynamically added at runtime
+    // (e.g. user re-runs `.vibe-init.sh`). Use symlink_metadata to avoid
+    // following the link.
+    if std::fs::symlink_metadata(dir_path)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+    {
+        return;
+    }
+
     let canonical_dir = canonicalize_lossy(dir_path);
 
     if !path_allowed(&canonical_dir, gi, canonical_root) {

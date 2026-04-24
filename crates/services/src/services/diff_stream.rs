@@ -79,16 +79,38 @@ pub async fn compute_diff_stats(
         })
         .await;
 
-        if let Ok(Ok(diffs)) = diffs_result {
-            for diff in diffs {
-                stats.files_changed += 1;
-                stats.lines_added += diff.additions.unwrap_or(0);
-                stats.lines_removed += diff.deletions.unwrap_or(0);
+        match diffs_result {
+            Ok(Ok(diffs)) => {
+                for diff in diffs {
+                    stats.files_changed += 1;
+                    stats.lines_added += diff.additions.unwrap_or(0);
+                    stats.lines_removed += diff.deletions.unwrap_or(0);
+                }
             }
+            // FORK-MOD-016: tolerate `pathspec ... is beyond a symbolic link`
+            // so that workspaces whose worktree contains directory symlinks
+            // (e.g. a fork-managed `.vibe-init.sh` placeholder layout) still
+            // report zero stats instead of `None` (which renders as "--").
+            Ok(Err(e)) if is_symlink_pathspec_error(&e) => {
+                tracing::debug!(
+                    "FORK-MOD-016: compute_diff_stats skipping repo {}: worktree contains symlinks ({e})",
+                    repo_with_branch.repo.name
+                );
+                continue;
+            }
+            _ => continue,
         }
     }
 
     Some(stats)
+}
+
+/// FORK-MOD-016: detect `git`'s "pathspec ... is beyond a symbolic link"
+/// rejection emitted by `verify_path` whenever a tracked path traverses a
+/// directory symlink. Treated as a soft error: diff stream skips the path
+/// instead of terminating.
+pub(crate) fn is_symlink_pathspec_error(e: &GitServiceError) -> bool {
+    e.to_string().contains("is beyond a symbolic link")
 }
 
 /// Maximum cumulative diff bytes to stream before omitting content (200MB)
@@ -200,10 +222,10 @@ pub async fn create(args: DiffStreamArgs) -> Result<DiffStreamHandle, DiffStream
             tracing::warn!("Diff stream ended: {e}");
             let _ = manager.tx.send(Err(io::Error::other(e.to_string()))).await;
         }
-        // Always emit Finished when the watcher loop terminates so frontend
-        // consumers never wait forever. Without this, any error path in
-        // `run()` (or a clean break) leaves `useDiffStream` permanently in
-        // `loading=true`.
+        // FORK-MOD-016 (upstream-friendly): always emit Finished when the
+        // watcher loop terminates so frontend consumers never wait forever.
+        // Without this, any error path in `run()` (or a clean break) leaves
+        // `useDiffStream` permanently in `loading=true`.
         let _ = manager.tx.send(Ok(LogMsg::Finished)).await;
     });
 
@@ -371,7 +393,20 @@ impl DiffStreamManager {
         let cumulative = self.cumulative.clone();
 
         tokio::task::spawn_blocking(move || {
-            let diffs = git.get_diffs(&worktree, &base, None)?;
+            // FORK-MOD-016: tolerate `git verify_path` symlink rejection.
+            // Returning Vec::new() lets the manager continue running so the
+            // initial Ready frame still propagates and the watcher loop keeps
+            // serving the rest of the worktree.
+            let diffs = match git.get_diffs(&worktree, &base, None) {
+                Ok(d) => d,
+                Err(e) if is_symlink_pathspec_error(&e) => {
+                    tracing::debug!(
+                        "FORK-MOD-016: fetch_diffs skipping diff because worktree contains symlinks ({e})"
+                    );
+                    Vec::new()
+                }
+                Err(e) => return Err(DiffStreamError::from(e)),
+            };
             let mut processed_diffs = Vec::with_capacity(diffs.len());
             for mut diff in diffs {
                 apply_stream_omit_policy(&mut diff, &cumulative, stats_only);
@@ -561,8 +596,21 @@ impl DiffStreamManager {
         let git = self.args.git_service.clone();
         let wt = self.args.worktree_path.clone();
         let base = self.current_base_commit.clone();
-        let fresh_paths =
-            tokio::task::spawn_blocking(move || git.get_diff_file_paths(&wt, &base)).await??;
+        let fresh_paths = match tokio::task::spawn_blocking(move || {
+            git.get_diff_file_paths(&wt, &base)
+        })
+        .await?
+        {
+            Ok(paths) => paths,
+            // FORK-MOD-016: same symlink-tolerance as fetch_diffs.
+            Err(e) if is_symlink_pathspec_error(&e) => {
+                tracing::debug!(
+                    "FORK-MOD-016: handle_reconcile skipping path discovery because worktree contains symlinks ({e})"
+                );
+                HashSet::new()
+            }
+            Err(e) => return Err(DiffStreamError::from(e)),
+        };
         self.needs_post_reset_discovery = false;
 
         // Batch remove ops
@@ -745,7 +793,18 @@ fn process_file_changes(
     repo_id: Uuid,
 ) -> Result<Patch, DiffStreamError> {
     let path_filter: Vec<&str> = changed_paths.iter().map(|s| s.as_str()).collect();
-    let current_diffs = git_service.get_diffs(worktree_path, base_commit, Some(&path_filter))?;
+    // FORK-MOD-016: tolerate symlink pathspec rejection from git verify_path.
+    let current_diffs = match git_service.get_diffs(worktree_path, base_commit, Some(&path_filter))
+    {
+        Ok(d) => d,
+        Err(e) if is_symlink_pathspec_error(&e) => {
+            tracing::debug!(
+                "FORK-MOD-016: process_file_changes skipping fs-driven diff because pathspec traverses symlinks ({e})"
+            );
+            return Ok(Patch(Vec::new()));
+        }
+        Err(e) => return Err(DiffStreamError::from(e)),
+    };
 
     let mut ops = Vec::new();
     let mut files_with_diffs = HashSet::new();
@@ -843,4 +902,35 @@ fn setup_git_watcher(
     }
 
     Some((debouncer, rx))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// FORK-MOD-016: ensure the symlink-detection helper recognises the
+    /// canonical `git verify_path` rejection (verbatim text seen in
+    /// production logs and unchanged across upstream `git` versions for
+    /// many years).
+    #[test]
+    fn detects_symlink_pathspec_error() {
+        let err = GitServiceError::InvalidRepository(
+            "git diff failed: git command failed: --- stdout\n\
+             fatal: pathspec '.claude/rules/file.md' is beyond a symbolic link\n"
+                .to_string(),
+        );
+        assert!(
+            is_symlink_pathspec_error(&err),
+            "expected symlink-pathspec error to be classified as soft"
+        );
+    }
+
+    #[test]
+    fn ignores_unrelated_git_errors() {
+        let err = GitServiceError::InvalidRepository("fatal: not a git repository".to_string());
+        assert!(
+            !is_symlink_pathspec_error(&err),
+            "non-symlink errors must not be silently swallowed"
+        );
+    }
 }
