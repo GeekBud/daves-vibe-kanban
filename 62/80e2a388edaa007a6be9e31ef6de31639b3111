@@ -1,0 +1,153 @@
+crates/services/src/services/diff_stream.rs
+  249b9b2502b4db38 198-199,203-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "6280e2a388edaa007a6be9e31ef6de31639b3111",
+  "prompts": {
+    "0dc7b9a1d2145ff3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-09f6ec62-b66c-4343-bef2-7cabe8d4cf78",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 2,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "18c6474a688004a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_242343368ffeuYJz890My4IVph-3c7253de-d57a-41e1-aa42-d1196948a063",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 53,
+      "total_deletions": 7,
+      "accepted_lines": 1,
+      "overriden_lines": 6
+    },
+    "249b9b2502b4db38": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_241630e3bffeTwg5lOad47px0u",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 34,
+      "total_deletions": 1,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    },
+    "648303abe05b33cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-3960e38d-f41a-4ae4-900e-5729051304e6",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "91cb42ee195b19ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-898619ff-a7e5-4135-ba72-2766ddcce48b",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 4,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "9e39a6b3098ad1ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-cad532ce-ba76-47c7-af45-8a4b958f6705",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "c1d028928475198a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-5a1d12ef-6c68-4cd6-834c-d21f643a1eef",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 1
+    },
+    "c62ac920716735ec": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_241c8b220ffe3vnpZSqAwbC5ra",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 333,
+      "total_deletions": 171,
+      "accepted_lines": 312,
+      "overriden_lines": 0
+    },
+    "edcf69345492ee05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-43b88863-376d-4140-8848-5856e3306f44",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 31,
+      "total_deletions": 3,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "f0b0a0dfa183785b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-10533a69-a07b-4db9-bdf5-57893aa160fb",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 4,
+      "accepted_lines": 0,
+      "overriden_lines": 3
+    },
+    "fa1b1517fc2895da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-f76ff977-88a2-40b3-8a79-eaf52b5d661b",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
