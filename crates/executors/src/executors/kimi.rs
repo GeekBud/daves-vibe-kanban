@@ -17,8 +17,8 @@ use crate::{
     env::ExecutionEnv,
     executor_discovery::ExecutorDiscoveredOptions,
     executors::{
-        AppendPrompt, AvailabilityInfo, BaseCodingAgent, ExecutorError, SpawnedChild,
-        StandardCodingAgentExecutor,
+        AppendPrompt, AvailabilityInfo, BaseCodingAgent, ExecutorError, ExecutorExitResult,
+        SpawnedChild, StandardCodingAgentExecutor,
     },
     logs::{
         NormalizedEntry, NormalizedEntryError, NormalizedEntryType,
@@ -123,7 +123,9 @@ fn parse_kimi_line(line: &str) -> Option<ParsedKimiEvent> {
             let mut blocks = Vec::new();
             if let Some(content) = value.get("content") {
                 if let Some(text) = content.as_str() {
-                    blocks.push(KimiContentBlock::Text { text: text.to_string() });
+                    blocks.push(KimiContentBlock::Text {
+                        text: text.to_string(),
+                    });
                 } else if let Some(arr) = content.as_array() {
                     for item in arr {
                         if let Some(typ) = item.get("type").and_then(|v| v.as_str()) {
@@ -355,12 +357,30 @@ fn parse_tool_arguments(
     match serde_json::from_str::<serde_json::Value>(arguments) {
         Ok(args) => {
             let display_name = match tool_name {
-                "ReadFile" => args.get("path").and_then(|v| v.as_str()).map(|p| format!("Read {}", p)),
-                "WriteFile" => args.get("path").and_then(|v| v.as_str()).map(|p| format!("Write {}", p)),
-                "StrReplaceFile" => args.get("path").and_then(|v| v.as_str()).map(|p| format!("Edit {}", p)),
-                "Shell" => args.get("command").and_then(|v| v.as_str()).map(|c| format!("Shell: {}", c)),
-                "Grep" => args.get("pattern").and_then(|v| v.as_str()).map(|p| format!("Search: {}", p)),
-                "Glob" => args.get("pattern").and_then(|v| v.as_str()).map(|p| format!("Glob: {}", p)),
+                "ReadFile" => args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .map(|p| format!("Read {}", p)),
+                "WriteFile" => args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .map(|p| format!("Write {}", p)),
+                "StrReplaceFile" => args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .map(|p| format!("Edit {}", p)),
+                "Shell" => args
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .map(|c| format!("Shell: {}", c)),
+                "Grep" => args
+                    .get("pattern")
+                    .and_then(|v| v.as_str())
+                    .map(|p| format!("Search: {}", p)),
+                "Glob" => args
+                    .get("pattern")
+                    .and_then(|v| v.as_str())
+                    .map(|p| format!("Glob: {}", p)),
                 _ => Some(format!("{} tool", tool_name)),
             };
             (display_name, Some(args))
@@ -370,35 +390,56 @@ fn parse_tool_arguments(
 }
 
 /// Parse tool arguments into ActionType
-fn parse_action_type(
-    tool_name: &str,
-    args: Option<&serde_json::Value>,
-) -> crate::logs::ActionType {
+fn parse_action_type(tool_name: &str, args: Option<&serde_json::Value>) -> crate::logs::ActionType {
     use crate::logs::ActionType;
     use crate::logs::utils::shell_command_parsing::CommandCategory;
-    
+
     match tool_name {
         "ReadFile" => ActionType::FileRead {
-            path: args.and_then(|a| a.get("path")).and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+            path: args
+                .and_then(|a| a.get("path"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
         },
         "WriteFile" => ActionType::FileEdit {
-            path: args.and_then(|a| a.get("path")).and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+            path: args
+                .and_then(|a| a.get("path"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
             changes: vec![],
         },
         "StrReplaceFile" => ActionType::FileEdit {
-            path: args.and_then(|a| a.get("path")).and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+            path: args
+                .and_then(|a| a.get("path"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
             changes: vec![],
         },
         "Shell" => ActionType::CommandRun {
-            command: args.and_then(|a| a.get("command")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            command: args
+                .and_then(|a| a.get("command"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
             result: None,
             category: CommandCategory::Other,
         },
         "Grep" => ActionType::Search {
-            query: args.and_then(|a| a.get("pattern")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            query: args
+                .and_then(|a| a.get("pattern"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
         },
         "Glob" => ActionType::Search {
-            query: args.and_then(|a| a.get("pattern")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            query: args
+                .and_then(|a| a.get("pattern"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
         },
         _ => ActionType::Tool {
             tool_name: tool_name.to_string(),
@@ -446,6 +487,18 @@ pub struct KimiCode {
     #[ts(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     session_id: Arc<Mutex<Option<String>>>,
+    /// FORK-MOD-013 (re-applied as part of FORK-MOD-015):
+    /// Exit signal sender shared between `spawn_with_session` and `normalize_logs`.
+    /// Kimi CLI does not auto-exit after the model finishes responding (it stays
+    /// alive waiting for stdin in --session mode), so without this signal the
+    /// container only learns about completion when `agent_task_timeout_s` (default
+    /// 15min) fires. We detect Kimi's actual completion marker
+    /// `"To resume this session: kimi -r <id>"` in the stdout stream and use this
+    /// channel to tell the container to gracefully terminate the process.
+    #[serde(skip)]
+    #[ts(skip)]
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    exit_signal_sender: Arc<Mutex<Option<tokio::sync::oneshot::Sender<ExecutorExitResult>>>>,
 }
 
 impl KimiCode {
@@ -517,7 +570,19 @@ impl KimiCode {
             stdin.shutdown().await?;
         }
 
-        Ok(child.into())
+        // FORK-MOD-015: Create exit signal channel so normalize_logs can request
+        // graceful shutdown when Kimi's completion marker is observed.
+        let (exit_signal_tx, exit_signal_rx) = tokio::sync::oneshot::channel();
+        {
+            let mut sender = self.exit_signal_sender.lock().await;
+            *sender = Some(exit_signal_tx);
+        }
+
+        Ok(SpawnedChild {
+            child,
+            exit_signal: Some(exit_signal_rx),
+            cancel: None,
+        })
     }
 }
 
@@ -626,6 +691,9 @@ impl StandardCodingAgentExecutor for KimiCode {
 
         // Get the session ID that was set during spawn
         let session_id_for_logs = self.session_id.clone();
+        // FORK-MOD-015: Exit signal sender, so we can notify the container as
+        // soon as Kimi prints its completion marker.
+        let exit_signal_for_logs = self.exit_signal_sender.clone();
 
         // Process stdout JSON lines
         let h2 = tokio::spawn(async move {
@@ -673,12 +741,12 @@ impl StandardCodingAgentExecutor for KimiCode {
                                     match block {
                                         KimiContentBlock::Think { think, .. } => {
                                             // FORK-MOD-007: Skip thinking blocks that just describe
-                                        // tool calls if they are followed by actual tool_calls.
-                                        // Previous logic was inverted, showing useless tool-call
-                                        // planning thoughts in the UI.
-                                        let should_skip = !msg.tool_calls.is_empty()
-                                            && think.len() >= 100
-                                            && think.contains("tool");
+                                            // tool calls if they are followed by actual tool_calls.
+                                            // Previous logic was inverted, showing useless tool-call
+                                            // planning thoughts in the UI.
+                                            let should_skip = !msg.tool_calls.is_empty()
+                                                && think.len() >= 100
+                                                && think.contains("tool");
                                             if !should_skip {
                                                 current_message = None;
                                                 message_index = None;
@@ -705,7 +773,9 @@ impl StandardCodingAgentExecutor for KimiCode {
                                                             );
                                                         } else {
                                                             msg_store.push_patch(
-                                                                ConversationPatch::replace(idx, entry),
+                                                                ConversationPatch::replace(
+                                                                    idx, entry,
+                                                                ),
                                                             );
                                                         }
                                                     }
@@ -760,15 +830,17 @@ impl StandardCodingAgentExecutor for KimiCode {
                                         parse_tool_arguments(&tool_name, &arguments);
 
                                     let idx = entry_index_provider.next();
-                                    let summary = display_name.unwrap_or_else(|| {
-                                        format!("{} tool", tool_name)
-                                    });
+                                    let summary = display_name
+                                        .unwrap_or_else(|| format!("{} tool", tool_name));
 
                                     let entry = NormalizedEntry {
                                         timestamp: None,
                                         entry_type: NormalizedEntryType::ToolUse {
                                             tool_name: summary.clone(),
-                                            action_type: parse_action_type(&tool_name, parsed_args.as_ref()),
+                                            action_type: parse_action_type(
+                                                &tool_name,
+                                                parsed_args.as_ref(),
+                                            ),
                                             status: crate::logs::ToolStatus::Success,
                                         },
                                         content: summary.clone(),
@@ -778,9 +850,9 @@ impl StandardCodingAgentExecutor for KimiCode {
                                             "arguments": arguments,
                                         })),
                                     };
-                                    msg_store.push_patch(
-                                        ConversationPatch::add_normalized_entry(idx, entry),
-                                    );
+                                    msg_store.push_patch(ConversationPatch::add_normalized_entry(
+                                        idx, entry,
+                                    ));
 
                                     // Store for matching with tool result
                                     pending_tool_calls.insert(tool_id, (summary, idx));
@@ -817,9 +889,9 @@ impl StandardCodingAgentExecutor for KimiCode {
                                         "is_result": true,
                                     })),
                                 };
-                                msg_store.push_patch(
-                                    ConversationPatch::add_normalized_entry(idx, entry),
-                                );
+                                msg_store.push_patch(ConversationPatch::add_normalized_entry(
+                                    idx, entry,
+                                ));
                             }
                             _ => {}
                         }
@@ -852,14 +924,38 @@ impl StandardCodingAgentExecutor for KimiCode {
                         msg_store.push_patch(ConversationPatch::add_normalized_entry(idx, entry));
                     }
                     Some(ParsedKimiEvent::RawLog(text)) => {
-                        // Check if it looks like a tool call or other structured output
-                        if text.starts_with("TurnBegin") || text.starts_with("TurnEnd") {
-                            // Reset state on turn boundaries
+                        // FORK-MOD-015: Detect Kimi's true completion marker.
+                        // Kimi CLI in `--print --session` mode prints
+                        //   "\nTo resume this session: kimi -r <session-id>\n"
+                        // right after the model finishes responding, but does
+                        // NOT exit the process (it keeps stdin open). Without
+                        // an explicit exit signal the container only learns
+                        // about completion when `agent_task_timeout_s` (15min)
+                        // fires. We treat this line as the authoritative
+                        // completion marker, hide it from the UI, and tell the
+                        // container to gracefully terminate.
+                        if text.contains("To resume this session:") && text.contains("kimi -r") {
+                            tracing::debug!("Kimi completion marker detected, sending exit signal");
+                            current_thinking = None;
+                            current_message = None;
+                            thinking_index = None;
+                            message_index = None;
+                            if let Some(sender) = exit_signal_for_logs.lock().await.take() {
+                                let _ = sender.send(ExecutorExitResult::Success);
+                            }
+                            // Intentionally do NOT push as SystemMessage — this
+                            // is an internal control marker, not user content.
+                        } else if text.starts_with("TurnBegin") || text.starts_with("TurnEnd") {
+                            // Defensive: keep legacy TurnBegin/TurnEnd handling
+                            // in case a future Kimi version adds these markers.
                             if text.starts_with("TurnEnd") {
                                 current_thinking = None;
                                 current_message = None;
                                 thinking_index = None;
                                 message_index = None;
+                                if let Some(sender) = exit_signal_for_logs.lock().await.take() {
+                                    let _ = sender.send(ExecutorExitResult::Success);
+                                }
                             }
                         } else if !text.is_empty() {
                             // Display as system message
@@ -950,6 +1046,7 @@ mod tests {
             cmd: CmdOverrides::default(),
             approvals: None,
             session_id: Arc::new(Mutex::new(None)),
+            exit_signal_sender: Arc::new(Mutex::new(None)),
         };
 
         assert!(kimi.thinking.is_none());
@@ -966,6 +1063,7 @@ mod tests {
             cmd: CmdOverrides::default(),
             approvals: None,
             session_id: Arc::new(Mutex::new(None)),
+            exit_signal_sender: Arc::new(Mutex::new(None)),
         };
 
         let builder = kimi.build_command_builder().unwrap();
@@ -1006,7 +1104,8 @@ mod tests {
         }
 
         // Test tool result format with string content (the problematic format)
-        let json_tool_str = r#"{"role":"tool","content":"Tool output as string","tool_call_id":"tool_123"}"#;
+        let json_tool_str =
+            r#"{"role":"tool","content":"Tool output as string","tool_call_id":"tool_123"}"#;
         let msg_tool_str = serde_json::from_str::<KimiMessage>(json_tool_str).unwrap();
         assert!(matches!(msg_tool_str.role, KimiRole::Tool));
         match msg_tool_str.content {
@@ -1016,7 +1115,8 @@ mod tests {
         assert_eq!(msg_tool_str.tool_call_id, Some("tool_123".to_string()));
 
         // Test tool result format with array content
-        let json_tool_arr = r#"{"role":"tool","content":[{"type":"text","text":"Tool output here"}]}"#;
+        let json_tool_arr =
+            r#"{"role":"tool","content":[{"type":"text","text":"Tool output here"}]}"#;
         let msg_tool_arr = serde_json::from_str::<KimiMessage>(json_tool_arr).unwrap();
         assert!(matches!(msg_tool_arr.role, KimiRole::Tool));
 
@@ -1038,7 +1138,7 @@ mod tests {
     #[tokio::test]
     async fn test_kimi_normalize_logs_produces_assistant_message() {
         use crate::executors::StandardCodingAgentExecutor;
-        use tokio::time::{sleep, Duration};
+        use tokio::time::{Duration, sleep};
         let msg_store = Arc::new(MsgStore::new());
 
         // Simulate the user's actual JSON sequence from Kimi 1.36.0
@@ -1064,6 +1164,7 @@ mod tests {
             cmd: CmdOverrides::default(),
             approvals: None,
             session_id: Arc::new(Mutex::new(Some("test-session".to_string()))),
+            exit_signal_sender: Arc::new(Mutex::new(None)),
         };
 
         let handles = executor.normalize_logs(msg_store.clone(), Path::new("/tmp"));
@@ -1075,10 +1176,13 @@ mod tests {
         sleep(Duration::from_millis(100)).await;
 
         let history = msg_store.get_history();
-        let patches: Vec<_> = history.iter().filter_map(|m| match m {
-            workspace_utils::log_msg::LogMsg::JsonPatch(p) => Some(p),
-            _ => None,
-        }).collect();
+        let patches: Vec<_> = history
+            .iter()
+            .filter_map(|m| match m {
+                workspace_utils::log_msg::LogMsg::JsonPatch(p) => Some(p),
+                _ => None,
+            })
+            .collect();
 
         // Count entry types in patches
         let mut assistant_msg_count = 0;
@@ -1087,7 +1191,9 @@ mod tests {
         let mut assistant_content = String::new();
 
         for patch in &patches {
-            if let Some((_, entry)) = crate::logs::utils::patch::extract_normalized_entry_from_patch(patch) {
+            if let Some((_, entry)) =
+                crate::logs::utils::patch::extract_normalized_entry_from_patch(patch)
+            {
                 match entry.entry_type {
                     NormalizedEntryType::AssistantMessage => {
                         assistant_msg_count += 1;
@@ -1100,10 +1206,26 @@ mod tests {
             }
         }
 
-        assert!(thinking_count >= 2, "Expected at least 2 thinking entries, got {}", thinking_count);
-        assert!(tool_use_count >= 2, "Expected at least 2 tool_use entries, got {}", tool_use_count);
-        assert_eq!(assistant_msg_count, 1, "Expected exactly 1 assistant_message, got {}", assistant_msg_count);
-        assert!(assistant_content.contains("Merge 已完成"), "Assistant message should contain the final summary, got: {}", assistant_content);
+        assert!(
+            thinking_count >= 2,
+            "Expected at least 2 thinking entries, got {}",
+            thinking_count
+        );
+        assert!(
+            tool_use_count >= 2,
+            "Expected at least 2 tool_use entries, got {}",
+            tool_use_count
+        );
+        assert_eq!(
+            assistant_msg_count, 1,
+            "Expected exactly 1 assistant_message, got {}",
+            assistant_msg_count
+        );
+        assert!(
+            assistant_content.contains("Merge 已完成"),
+            "Assistant message should contain the final summary, got: {}",
+            assistant_content
+        );
     }
 
     #[tokio::test]
@@ -1113,7 +1235,9 @@ mod tests {
 
         let msg_store = Arc::new(MsgStore::new());
         for line in content.lines() {
-            if line.trim().is_empty() { continue; }
+            if line.trim().is_empty() {
+                continue;
+            }
             let msg: workspace_utils::log_msg::LogMsg = serde_json::from_str(line).unwrap();
             msg_store.push(msg);
         }
@@ -1127,6 +1251,7 @@ mod tests {
             cmd: CmdOverrides::default(),
             approvals: None,
             session_id: Arc::new(Mutex::new(Some("test-session".to_string()))),
+            exit_signal_sender: Arc::new(Mutex::new(None)),
         };
 
         let handles = executor.normalize_logs(msg_store.clone(), Path::new("/tmp"));
@@ -1136,17 +1261,22 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
         let history = msg_store.get_history();
-        let patches: Vec<_> = history.iter().filter_map(|m| match m {
-            workspace_utils::log_msg::LogMsg::JsonPatch(p) => Some(p),
-            _ => None,
-        }).collect();
+        let patches: Vec<_> = history
+            .iter()
+            .filter_map(|m| match m {
+                workspace_utils::log_msg::LogMsg::JsonPatch(p) => Some(p),
+                _ => None,
+            })
+            .collect();
 
         let mut assistant_count = 0;
         let mut thinking_count = 0;
         let mut tool_use_count = 0;
 
         for patch in &patches {
-            if let Some((_, entry)) = crate::logs::utils::patch::extract_normalized_entry_from_patch(patch) {
+            if let Some((_, entry)) =
+                crate::logs::utils::patch::extract_normalized_entry_from_patch(patch)
+            {
                 match entry.entry_type {
                     NormalizedEntryType::AssistantMessage => assistant_count += 1,
                     NormalizedEntryType::Thinking => thinking_count += 1,
@@ -1156,9 +1286,19 @@ mod tests {
             }
         }
 
-        println!("REPLAY RESULT: patches={} assistant={} thinking={} tool_use={}", patches.len(), assistant_count, thinking_count, tool_use_count);
+        println!(
+            "REPLAY RESULT: patches={} assistant={} thinking={} tool_use={}",
+            patches.len(),
+            assistant_count,
+            thinking_count,
+            tool_use_count
+        );
 
-        assert!(assistant_count >= 1, "Expected at least 1 assistant message, got {}", assistant_count);
+        assert!(
+            assistant_count >= 1,
+            "Expected at least 1 assistant message, got {}",
+            assistant_count
+        );
     }
 
     #[test]
@@ -1180,7 +1320,11 @@ mod tests {
         let content = KimiContent::Text(text);
         let result = truncate_tool_result(&content);
         assert!(result.starts_with("x"), "Should start with x");
-        assert!(result.ends_with("... [500 more chars]"), "Should indicate truncation: got {}", result);
+        assert!(
+            result.ends_with("... [500 more chars]"),
+            "Should indicate truncation: got {}",
+            result
+        );
         // Count visible chars before "..."
         let prefix_len = result.find("...").unwrap();
         assert_eq!(prefix_len, 500, "Should have 500 visible chars");
@@ -1189,8 +1333,13 @@ mod tests {
     #[test]
     fn test_truncate_tool_result_blocks() {
         let blocks = vec![
-            KimiContentBlock::Text { text: "Hello ".to_string() },
-            KimiContentBlock::Think { think: "world".to_string(), encrypted: None },
+            KimiContentBlock::Text {
+                text: "Hello ".to_string(),
+            },
+            KimiContentBlock::Think {
+                think: "world".to_string(),
+                encrypted: None,
+            },
         ];
         let content = KimiContent::Blocks(blocks);
         assert_eq!(truncate_tool_result(&content), "Hello world");
@@ -1199,13 +1348,23 @@ mod tests {
     #[test]
     fn test_truncate_tool_result_blocks_long() {
         let blocks = vec![
-            KimiContentBlock::Text { text: "a".repeat(300) },
-            KimiContentBlock::Text { text: "b".repeat(300) },
-            KimiContentBlock::Text { text: "c".repeat(300) },
+            KimiContentBlock::Text {
+                text: "a".repeat(300),
+            },
+            KimiContentBlock::Text {
+                text: "b".repeat(300),
+            },
+            KimiContentBlock::Text {
+                text: "c".repeat(300),
+            },
         ];
         let content = KimiContent::Blocks(blocks);
         let result = truncate_tool_result(&content);
         assert!(result.starts_with("a"), "Should start with a");
-        assert!(result.ends_with("... [400 more chars]"), "Should indicate 400 more chars: got {}", result);
+        assert!(
+            result.ends_with("... [400 more chars]"),
+            "Should indicate 400 more chars: got {}",
+            result
+        );
     }
 }
