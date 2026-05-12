@@ -1,0 +1,26 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.7",
+  "base_commit_sha": "82103caace9f57bd3a68541c8fc1172c0d1f583a",
+  "prompts": {
+    "18c6474a688004a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_242343368ffeuYJz890My4IVph-3c7253de-d57a-41e1-aa42-d1196948a063",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 7,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/executors/src/executors/cursor.rs": {
+          "accepted_lines": 7
+        }
+      }
+    }
+  }
+}
