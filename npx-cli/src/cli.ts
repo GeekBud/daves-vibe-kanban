@@ -23,6 +23,11 @@ const CLI_VERSION: string = require("../package.json").version;
 
 type RootOptions = {
   desktop?: boolean;
+  debug?: boolean;
+};
+
+type SubOptions = {
+  debug?: boolean;
 };
 
 // Resolve effective arch for our published 64-bit binaries only.
@@ -245,6 +250,7 @@ async function runReview(args: string[]): Promise<void> {
 async function runMain(desktopMode: boolean): Promise<void> {
   checkForUpdates();
 
+
   const modeLabel = LOCAL_DEV_MODE ? " (local dev)" : "";
   const tauriPlatform = getTauriPlatform(platformDir);
 
@@ -313,22 +319,34 @@ async function main(): Promise<void> {
   cli
     .command("[...args]", "Launch the local vibe-kanban app")
     .option("--desktop", "Launch the desktop app instead of browser mode")
+    .option("--debug", "Enable debug logging (sets VK_LOG_LEVEL=debug)")
     .allowUnknownOptions()
     .action((_args: string[], options: RootOptions) => {
+      if (options.debug) {
+        process.env.VK_LOG_LEVEL = "debug";
+      }
       runOrExit(runMain(Boolean(options.desktop)));
     });
 
   cli
     .command("review [...args]", "Run the review CLI")
+    .option("--debug", "Enable debug logging (sets VK_LOG_LEVEL=debug)")
     .allowUnknownOptions()
-    .action((args: string[]) => {
+    .action((args: string[], options: SubOptions) => {
+      if (options.debug) {
+        process.env.VK_LOG_LEVEL = "debug";
+      }
       runOrExit(runReview(args));
     });
 
   cli
     .command("mcp [...args]", "Run the MCP server")
+    .option("--debug", "Enable debug logging (sets VK_LOG_LEVEL=debug)")
     .allowUnknownOptions()
-    .action((args: string[]) => {
+    .action((args: string[], options: SubOptions) => {
+      if (options.debug) {
+        process.env.VK_LOG_LEVEL = "debug";
+      }
       runOrExit(runMcp(args));
     });
 

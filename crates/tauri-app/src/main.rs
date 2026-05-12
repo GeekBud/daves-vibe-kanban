@@ -116,8 +116,8 @@ fn main() {
         .expect("Failed to install rustls crypto provider");
 
     let cfg = utils::env_config::load_config();
-    let log_level = utils::env_config::resolve_string(cfg.logging.rust_log.as_deref(), "RUST_LOG")
-        .unwrap_or_else(|| "info".to_string());
+    // FORK-MOD-014: 与 server/mcp/review 一致，仅认 VK_LOG_LEVEL，缺省 info。
+    let log_level = utils::env_config::resolve_log_level();
     let filter_string = format!(
         "warn,server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level},vibe_kanban_tauri={level}",
         level = log_level

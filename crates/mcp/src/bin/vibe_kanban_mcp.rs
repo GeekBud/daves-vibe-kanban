@@ -142,11 +142,15 @@ fn init_process_logging(log_prefix: &str, version: &str) {
 
     sentry_utils::init_once(SentrySource::Mcp);
 
+    // FORK-MOD-014: 与 server 一致，仅认 VK_LOG_LEVEL，缺省 info。
+    let log_level = utils::env_config::resolve_log_level();
+    let env_filter = EnvFilter::try_new(&log_level).unwrap_or_else(|_| EnvFilter::new("info"));
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
                 .with_writer(std::io::stderr)
-                .with_filter(EnvFilter::new("debug")),
+                .with_filter(env_filter),
         )
         .with(sentry_layer())
         .init();

@@ -107,12 +107,19 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    // Initialize tracing
-    let filter = if args.verbose {
-        EnvFilter::new("debug")
-    } else {
-        EnvFilter::new("warn")
-    };
+    // FORK-MOD-014: 与 server/mcp 一致，仅认 VK_LOG_LEVEL，缺省 info。
+    // 兼容旧 `--verbose`：当未显式设置 VK_LOG_LEVEL 时等价于 debug。
+    let log_level = std::env::var("VK_LOG_LEVEL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            if args.verbose {
+                "debug".to_string()
+            } else {
+                "info".to_string()
+            }
+        });
+    let filter = EnvFilter::try_new(&log_level).unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     println!("{}", BANNER);

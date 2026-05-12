@@ -13,7 +13,7 @@ use tower_http::validate_request::ValidateRequestHeaderLayer;
 use tracing_subscriber::{EnvFilter, prelude::*};
 use utils::{
     assets::asset_dir,
-    env_config::{load_config, resolve_string},
+    env_config::{load_config, resolve_log_level, resolve_string},
     port_file::write_port_file_with_proxy,
     sentry::{self as sentry_utils, SentrySource, sentry_layer},
 };
@@ -40,10 +40,10 @@ async fn main() -> Result<(), VibeKanbanError> {
     sentry_utils::init_once(SentrySource::Backend);
 
     let cfg = load_config();
-    // FORK-MOD-011: VK_LOG_LEVEL > RUST_LOG > config file > default "info"
-    let log_level = resolve_string(cfg.logging.rust_log.as_deref(), "VK_LOG_LEVEL")
-        .or_else(|| std::env::var("RUST_LOG").ok().filter(|s| !s.is_empty()))
-        .unwrap_or_else(|| "info".to_string());
+    // FORK-MOD-014: 单一日志入口
+    //   只认 VK_LOG_LEVEL（由 npx-cli `--debug` 内部传入），其它一律默认 info。
+    //   不再读 RUST_LOG / config 文件中的 logging 段，避免多入口冲突。
+    let log_level = resolve_log_level();
     let is_debug = log_level.eq_ignore_ascii_case("debug");
 
     let filter_string = format!(
@@ -56,7 +56,7 @@ async fn main() -> Result<(), VibeKanbanError> {
         .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
         .with(sentry_layer());
 
-    // File logging to /tmp/vibe-kanban.log only when VK_LOG_LEVEL=debug
+    // File logging to /tmp/vibe-kanban.log only when --debug is enabled
     if is_debug {
         let log_file = std::fs::OpenOptions::new()
             .create(true)
@@ -66,9 +66,13 @@ async fn main() -> Result<(), VibeKanbanError> {
         let (non_blocking, _guard) = tracing_appender::non_blocking(log_file);
         std::mem::forget(_guard);
         registry
-            .with(tracing_subscriber::fmt::layer().with_writer(non_blocking).with_filter(
-                EnvFilter::try_new("debug").expect("Failed to create file tracing filter"),
-            ))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(non_blocking)
+                    .with_filter(
+                        EnvFilter::try_new("debug").expect("Failed to create file tracing filter"),
+                    ),
+            )
             .init();
     } else {
         registry.init();
@@ -130,9 +134,12 @@ async fn main() -> Result<(), VibeKanbanError> {
             0
         });
 
-    let proxy_port = resolve_string(cfg.server.preview_proxy_port.as_deref(), "PREVIEW_PROXY_PORT")
-        .and_then(|s| s.trim().parse::<u16>().ok())
-        .unwrap_or(0);
+    let proxy_port = resolve_string(
+        cfg.server.preview_proxy_port.as_deref(),
+        "PREVIEW_PROXY_PORT",
+    )
+    .and_then(|s| s.trim().parse::<u16>().ok())
+    .unwrap_or(0);
 
     let host = resolve_string(cfg.server.host.as_deref(), "HOST")
         .unwrap_or_else(|| "127.0.0.1".to_string());

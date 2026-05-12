@@ -3,7 +3,8 @@ use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 
 static CONFIG: OnceLock<DaveEnvConfig> = OnceLock::new();
 
-const DEFAULT_CONFIG_PATH: &str = "/Users/lianghusile/dave/appData/daves-vibe-kanban/daves_env_config.json";
+const DEFAULT_CONFIG_PATH: &str =
+    "/Users/lianghusile/dave/appData/daves-vibe-kanban/daves_env_config.json";
 
 fn config_path() -> PathBuf {
     std::env::var("DAVES_ENV_CONFIG_PATH")
@@ -21,8 +22,6 @@ pub struct DaveEnvConfig {
     pub remote: RemoteConfig,
     #[serde(default)]
     pub telemetry: TelemetryConfig,
-    #[serde(default)]
-    pub logging: LoggingConfig,
     #[serde(default)]
     pub frontend: FrontendConfig,
     #[serde(default)]
@@ -60,11 +59,6 @@ pub struct TelemetryConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-pub struct LoggingConfig {
-    pub rust_log: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize, Default)]
 pub struct FrontendConfig {
     pub frontend_port: Option<String>,
 }
@@ -99,7 +93,27 @@ pub fn load_config() -> &'static DaveEnvConfig {
 /// Get a string value from config, falling back to an environment variable.
 pub fn resolve_string(config_value: Option<&str>, env_name: &str) -> Option<String> {
     config_value
-        .map(|s| if s.is_empty() { None } else { Some(s.to_string()) })
+        .map(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
         .flatten()
         .or_else(|| std::env::var(env_name).ok().filter(|s| !s.is_empty()))
+}
+
+/// FORK-MOD-014: 全局唯一日志级别入口。
+///
+/// 仅识别 `VK_LOG_LEVEL`（由 npx-cli 在 `--debug` 时设置为 "debug"），
+/// 其它任何来源（RUST_LOG、config 文件等）一律忽略，缺省一律 `"info"`。
+///
+/// 这样保证从 `node bin/cli.js [--debug]` 启动时行为完全可预测，
+/// 不会被环境/配置文件意外覆盖。
+pub fn resolve_log_level() -> String {
+    std::env::var("VK_LOG_LEVEL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "info".to_string())
 }
