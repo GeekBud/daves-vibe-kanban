@@ -14,7 +14,7 @@ use deployment::Deployment;
 use rand::{Rng, distributions::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use services::services::{
-    config::save_config_to_file, oauth_credentials::Credentials, remote_sync,
+    config::save_config_to_file, oauth_credentials::Credentials,
 };
 use sha2::{Digest, Sha256};
 use ts_rs::TS;
@@ -390,12 +390,7 @@ async fn finalize_login(
         }
     };
 
-    if let Ok(client) = deployment.remote_client() {
-        let pool = deployment.db().pool.clone();
-        let git = deployment.git().clone();
-        tokio::spawn(async move {
-            remote_sync::sync_all_linked_workspaces(&client, &pool, &git).await;
-        });
+    if let Ok(_client) = deployment.remote_client() {
     }
 
     deployment.trigger_pr_sync();

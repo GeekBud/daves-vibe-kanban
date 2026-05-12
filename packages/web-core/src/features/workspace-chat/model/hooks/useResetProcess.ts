@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from 'react';
 import { useExecutionProcessesContext } from '@/shared/hooks/useExecutionProcessesContext';
-import { useBranchStatus } from '@/shared/hooks/useBranchStatus';
 import { isCodingAgent } from '@/shared/constants/processes';
 import { useResetProcessMutation } from './useResetProcessMutation';
 
@@ -15,13 +14,12 @@ export interface UseResetProcessResult {
  * @param selectedSessionId - passed explicitly to avoid subscribing to WorkspaceContext
  */
 export function useResetProcess(
-  workspaceId: string | undefined,
+  _workspaceId: string | undefined,
   selectedSessionId: string | undefined
 ): UseResetProcessResult {
-  const { data: branchStatus } = useBranchStatus(workspaceId);
   const { executionProcessesAll: processes } = useExecutionProcessesContext();
 
-  const resetMutation = useResetProcessMutation(selectedSessionId ?? '');
+  const resetMutation = useResetProcessMutation(selectedSessionId ?? '', undefined);
   const isResetPending = resetMutation.isPending;
 
   const hasCodingProcess = useMemo(
@@ -42,11 +40,11 @@ export function useResetProcess(
       if (!selectedSessionId) return;
       resetMutation.mutate({
         executionProcessId,
-        branchStatus,
+        branchStatus: undefined,
         processes,
       });
     },
-    [branchStatus, processes, resetMutation, selectedSessionId]
+    [selectedSessionId, resetMutation, processes]
   );
 
   return useMemo(

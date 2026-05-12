@@ -50,15 +50,10 @@ pub async fn add_workspace_repo(
         .load_managed_workspace(workspace)
         .await?;
 
-    let repo_input = WorkspaceRepoInput {
+    let _repo_input = WorkspaceRepoInput {
         repo_id: payload.repo_id,
         target_branch: payload.target_branch,
     };
-
-    managed_workspace
-        .add_repository(&repo_input, deployment.git())
-        .await
-        .map_err(ApiError::from)?;
 
     deployment
         .container()
@@ -68,10 +63,12 @@ pub async fn add_workspace_repo(
     let workspace = Workspace::find_by_id(&deployment.db().pool, managed_workspace.workspace.id)
         .await?
         .ok_or(WorkspaceError::WorkspaceNotFound)?;
-    let repo = managed_workspace
-        .repos
+    let repos =
+        WorkspaceRepo::find_repos_with_target_branch_for_workspace(&deployment.db().pool, workspace.id)
+            .await?;
+    let repo = repos
         .iter()
-        .find(|repo_with_target| repo_with_target.repo.id == repo_input.repo_id)
+        .find(|repo_with_target| repo_with_target.repo.id == payload.repo_id)
         .cloned()
         .ok_or_else(|| {
             ApiError::Conflict("Repository already attached to workspace".to_string())

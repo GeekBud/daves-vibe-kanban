@@ -13,11 +13,8 @@ deployment = { path = "../deployment" }
 executors = { path = "../executors" }
 local-deployment = { path = "../local-deployment" }
 utils = { path = "../utils" }
-git = { path = "../git" }
-git-host = { path = "../git-host" }
 db = { path = "../db" }
 services = { path = "../services" }
-worktree-manager = { path = "../worktree-manager" }
 workspace-manager = { path = "../workspace-manager" }
 embedded-ssh = { path = "../embedded-ssh" }
 relay-control = { path = "../relay-control" }

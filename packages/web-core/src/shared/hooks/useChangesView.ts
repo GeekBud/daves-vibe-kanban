@@ -1,7 +1,6 @@
 import { useContext } from 'react';
 import { createHmrContext } from '@/shared/lib/hmrContext';
 
-/** Callback type for scroll-to-file implementation (provided by ChangesPanelContainer) */
 export type ScrollToFileCallback = (path: string, lineNumber?: number) => void;
 
 interface ChangesViewContextValue {

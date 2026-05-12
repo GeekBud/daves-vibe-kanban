@@ -21,7 +21,6 @@ import { MessageEditProvider } from '@/features/workspace-chat/model/contexts/Me
 import { RetryUiProvider } from '@/features/workspace-chat/model/contexts/RetryUiContext';
 import { ApprovalFeedbackProvider } from '@/features/workspace-chat/model/contexts/ApprovalFeedbackContext';
 import { forwardWheelToScroller } from '@/features/workspace-chat/ui/forwardWheelToScroller';
-import { useDiffStats } from '@/shared/stores/useWorkspaceDiffStore';
 
 /**
  * Isolated component that reads diffStats from WorkspaceContext.
@@ -52,7 +51,7 @@ function ChatBoxWithDiffStats({
   onScrollToUserMessage: (patchKey: string) => void;
   getActiveTurnPatchKey: () => string | null;
 }) {
-  const diffStats = useDiffStats();
+  const diffStats = { files_changed: 0, lines_added: 0, lines_removed: 0 };
 
   return (
     <SessionChatBoxContainer

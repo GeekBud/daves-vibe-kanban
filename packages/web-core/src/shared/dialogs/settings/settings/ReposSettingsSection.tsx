@@ -5,7 +5,6 @@ import { isEqual } from 'lodash';
 import { GitBranchIcon, PlusIcon, SpinnerIcon } from '@phosphor-icons/react';
 import { Loader2 } from 'lucide-react';
 import { create, useModal } from '@ebay/nice-modal-react';
-import { useMachineRepoBranches } from '@/shared/hooks/useRepoBranches';
 import { useScriptPlaceholders } from '@/shared/hooks/useScriptPlaceholders';
 import { useAllOrganizationProjects } from '@/shared/hooks/useAllOrganizationProjects';
 import { getProjectRepoDefaults } from '@/shared/hooks/useProjectRepoDefaults';
@@ -160,11 +159,8 @@ export function ReposSettingsSection({
     initialState?.repoId ?? ''
   );
 
-  // Fetch branches for the selected repo
-  const { data: branches = [], isLoading: branchesLoading } =
-    useMachineRepoBranches(machineClient, selectedRepoId || null, {
-      enabled: !!selectedRepoId,
-    });
+  const branches: never[] = [];
+  const branchesLoading = false;
 
   // Add "Use current branch" option at the top of branches list
   const branchItems = useMemo(() => {

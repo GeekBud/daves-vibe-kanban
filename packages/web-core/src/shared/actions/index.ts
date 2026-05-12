@@ -26,13 +26,9 @@ import {
   PauseIcon,
   SpinnerIcon,
   GitPullRequestIcon,
-  GitMergeIcon,
   GitForkIcon,
-  ArrowsClockwiseIcon,
-  CrosshairIcon,
   DesktopIcon,
   PencilSimpleIcon,
-  ArrowUpIcon,
   HighlighterIcon,
   ListIcon,
   MegaphoneIcon,
@@ -46,7 +42,6 @@ import {
   ProhibitIcon,
 } from '@phosphor-icons/react';
 import { useDiffViewStore } from '@/shared/stores/useDiffViewStore';
-import { useWorkspaceDiffStore } from '@/shared/stores/useWorkspaceDiffStore';
 import {
   useUiPreferencesStore,
   RIGHT_MAIN_PANEL_MODES,
@@ -55,17 +50,11 @@ import {
 import { workspacesApi, relayApi, repoApi } from '@/shared/lib/api';
 import { bulkUpdateIssues } from '@/shared/lib/remoteApi';
 import { workspaceRecordKeys } from '@/shared/hooks/useWorkspaceRecord';
-import { workspaceRepoKeys } from '@/shared/hooks/useWorkspaceRepo';
-import { repoBranchKeys } from '@/shared/hooks/useRepoBranches';
 import { workspaceSummaryKeys } from '@/shared/hooks/workspaceSummaryKeys';
 import { ConfirmDialog } from '@vibe/ui/components/ConfirmDialog';
-import { ChangeTargetDialog } from '@vibe/ui/components/ChangeTargetDialog';
 import { DeleteWorkspaceDialog } from '@vibe/ui/components/DeleteWorkspaceDialog';
-import { RebaseDialog } from '@/shared/dialogs/command-bar/RebaseDialog';
-import { ResolveConflictsDialog } from '@/shared/dialogs/tasks/ResolveConflictsDialog';
 import { RenameWorkspaceDialog } from '@vibe/ui/components/RenameWorkspaceDialog';
 import { ProjectsGuideDialog } from '@vibe/ui/components/ProjectsGuideDialog';
-import { CreatePRDialog } from '@/shared/dialogs/command-bar/CreatePRDialog';
 import { getIdeName } from '@/shared/lib/ideName';
 import { EditorSelectionDialog } from '@/shared/dialogs/command-bar/EditorSelectionDialog';
 import { StartReviewDialog } from '@/shared/dialogs/command-bar/StartReviewDialog';
@@ -707,9 +696,8 @@ export const Actions = {
   ToggleAllDiffs: {
     id: 'toggle-all-diffs',
     label: () => {
-      const diffPaths = Array.from(useWorkspaceDiffStore.getState().diffPaths);
       const { expanded } = useUiPreferencesStore.getState();
-      const keys = diffPaths.map((p) => `diff:${p}`);
+      const keys = Array.from(new Set<string>()).map((p) => `diff:${p}`);
       const isAllExpanded =
         keys.length > 0 && keys.every((k) => expanded[k] !== false);
       return isAllExpanded ? 'Collapse All Diffs' : 'Expand All Diffs';
@@ -724,9 +712,8 @@ export const Actions = {
     getTooltip: (ctx) =>
       ctx.isAllDiffsExpanded ? 'Collapse all diffs' : 'Expand all diffs',
     execute: () => {
-      const diffPaths = Array.from(useWorkspaceDiffStore.getState().diffPaths);
       const { expanded, setExpandedAll } = useUiPreferencesStore.getState();
-      const keys = diffPaths.map((p) => `diff:${p}`);
+      const keys = Array.from(new Set<string>()).map((p) => `diff:${p}`);
       const isAllExpanded =
         keys.length > 0 && keys.every((k) => expanded[k] !== false);
       setExpandedAll(keys, !isAllExpanded);
@@ -845,251 +832,6 @@ export const Actions = {
             ctx.currentWorkspaceId ?? undefined
           );
       }
-    },
-  },
-
-  // === Git Actions ===
-  GitCreatePR: {
-    id: 'git-create-pr',
-    label: 'Create Pull Request',
-    icon: GitPullRequestIcon,
-    shortcut: 'X P',
-    requiresTarget: ActionTargetType.GIT,
-    isVisible: (ctx) => ctx.hasWorkspace && ctx.hasGitRepos,
-    execute: async (ctx, workspaceId, repoId) => {
-      const workspace = await getWorkspace(ctx.queryClient, workspaceId);
-
-      const repos = await workspacesApi.getRepos(workspaceId);
-      const repo = repos.find((r) => r.id === repoId);
-
-      // Resolve vibe-kanban identifier from remote workspace + issue
-      let issueIdentifier: string | undefined;
-      const remoteWs = ctx.remoteWorkspaces.find(
-        (w) => w.local_workspace_id === workspaceId
-      );
-      if (remoteWs?.issue_id && ctx.projectMutations?.getIssue) {
-        const issue = ctx.projectMutations.getIssue(remoteWs.issue_id);
-        issueIdentifier = issue?.simple_id || remoteWs.issue_id;
-      }
-
-      const result = await CreatePRDialog.show({
-        attempt: workspace,
-        repoId,
-        targetBranch: repo?.target_branch,
-        issueIdentifier,
-      });
-
-      if (!result.success && result.error) {
-        throw new Error(result.error);
-      }
-    },
-  },
-
-  GitLinkPR: {
-    id: 'git-link-pr',
-    label: 'Link Pull Request',
-    icon: LinkIcon,
-    requiresTarget: ActionTargetType.GIT,
-    isVisible: (ctx) => ctx.hasWorkspace && ctx.hasGitRepos && !ctx.hasOpenPR,
-    execute: async (ctx, workspaceId, repoId) => {
-      const result = await workspacesApi.attachPr(workspaceId, {
-        repo_id: repoId,
-      });
-
-      if (result.success && result.data.pr_attached && result.data.pr_number) {
-        invalidateWorkspaceQueries(ctx.queryClient, workspaceId);
-        ctx.queryClient.invalidateQueries({
-          queryKey: ['branch-status'],
-        });
-
-        await ConfirmDialog.show({
-          title: 'Pull Request Linked',
-          message: `Linked PR #${result.data.pr_number}${result.data.pr_url ? ` — ${result.data.pr_url}` : ''}`,
-          confirmText: 'OK',
-          showCancelButton: false,
-          variant: 'success',
-        });
-      } else if (result.success && !result.data.pr_attached) {
-        await ConfirmDialog.show({
-          title: 'No Pull Request Found',
-          message:
-            'No open pull request was found matching this branch. Make sure a PR exists for this branch on the remote.',
-          confirmText: 'OK',
-          showCancelButton: false,
-          variant: 'info',
-        });
-      } else if (!result.success) {
-        throw new Error(result.message || 'Failed to attach PR');
-      }
-    },
-  },
-
-  GitMerge: {
-    id: 'git-merge',
-    label: 'Merge',
-    icon: GitMergeIcon,
-    shortcut: 'X M',
-    requiresTarget: ActionTargetType.GIT,
-    isVisible: (ctx) => ctx.hasWorkspace && ctx.hasGitRepos,
-    execute: async (ctx, workspaceId, repoId) => {
-      // Check for existing conflicts first
-      const branchStatus = await workspacesApi.getBranchStatus(workspaceId);
-      const repoStatus = branchStatus?.find((s) => s.repo_id === repoId);
-
-      // Check if repo has an open PR - cannot merge directly
-      const hasOpenPR = repoStatus?.merges?.some(
-        (m: Merge) => m.type === 'pr' && m.pr_info.status === 'open'
-      );
-      if (hasOpenPR) {
-        await ConfirmDialog.show({
-          title: 'Cannot Merge',
-          message:
-            'This repository has an open pull request. Please close or merge the PR before merging directly.',
-          confirmText: 'OK',
-          showCancelButton: false,
-        });
-        return;
-      }
-
-      const hasConflicts =
-        repoStatus?.is_rebase_in_progress ||
-        (repoStatus?.conflicted_files?.length ?? 0) > 0;
-
-      if (hasConflicts && repoStatus) {
-        // Skip showing the dialog if a process is already running
-        // (e.g. an AI session is already resolving these conflicts)
-        const isRunning = ctx.activeWorkspaces.find(
-          (w) => w.id === workspaceId
-        )?.isRunning;
-        if (isRunning) return;
-
-        // Show resolve conflicts dialog
-        const workspace = await getWorkspace(ctx.queryClient, workspaceId);
-        const result = await ResolveConflictsDialog.show({
-          workspaceId,
-          conflictOp: repoStatus.conflict_op ?? 'merge',
-          sourceBranch: workspace.branch,
-          targetBranch: repoStatus.target_branch_name,
-          conflictedFiles: repoStatus.conflicted_files ?? [],
-          repoName: repoStatus.repo_name,
-        });
-
-        if (result.action === 'resolved') {
-          invalidateWorkspaceQueries(ctx.queryClient, workspaceId);
-        }
-        return;
-      }
-
-      // Check if branch is behind - need to rebase first
-      const commitsBehind = repoStatus?.commits_behind ?? 0;
-      if (commitsBehind > 0) {
-        // Prompt user to rebase first
-        const confirmRebase = await ConfirmDialog.show({
-          title: 'Rebase Required',
-          message: `Your branch is ${commitsBehind} commit${commitsBehind === 1 ? '' : 's'} behind the target branch. Would you like to rebase first?`,
-          confirmText: 'Rebase',
-          cancelText: 'Cancel',
-        });
-
-        if (confirmRebase === 'confirmed') {
-          // Open rebase dialog - it loads branches/status internally
-          await RebaseDialog.show({
-            workspaceId: workspaceId,
-            repoId,
-          });
-        }
-        return;
-      }
-
-      const confirmResult = await ConfirmDialog.show({
-        title: 'Merge Branch',
-        message:
-          'Are you sure you want to merge this branch into the target branch?',
-        confirmText: 'Merge',
-        cancelText: 'Cancel',
-      });
-
-      if (confirmResult === 'confirmed') {
-        await workspacesApi.merge(workspaceId, { repo_id: repoId });
-        invalidateWorkspaceQueries(ctx.queryClient, workspaceId);
-      }
-    },
-  },
-
-  GitRebase: {
-    id: 'git-rebase',
-    label: 'Rebase',
-    icon: ArrowsClockwiseIcon,
-    shortcut: 'X R',
-    requiresTarget: ActionTargetType.GIT,
-    isVisible: (ctx) => ctx.hasWorkspace && ctx.hasGitRepos,
-    execute: async (_ctx, workspaceId, repoId) => {
-      // Open rebase dialog - it loads branches/status internally and handles conflicts
-      await RebaseDialog.show({
-        workspaceId: workspaceId,
-        repoId,
-      });
-    },
-  },
-
-  GitChangeTarget: {
-    id: 'git-change-target',
-    label: 'Change Target Branch',
-    icon: CrosshairIcon,
-    requiresTarget: ActionTargetType.GIT,
-    isVisible: (ctx) => ctx.hasWorkspace && ctx.hasGitRepos,
-    execute: async (ctx, workspaceId, repoId) => {
-      const branches = await repoApi.getBranches(repoId);
-      await ChangeTargetDialog.show({
-        branches: branches.map((branch) => ({
-          name: branch.name,
-          isCurrent: branch.is_current,
-        })),
-        onChangeTargetBranch: async (newTargetBranch) => {
-          await workspacesApi.change_target_branch(workspaceId, {
-            new_target_branch: newTargetBranch,
-            repo_id: repoId,
-          });
-
-          ctx.queryClient.invalidateQueries({
-            queryKey: ['branchStatus', workspaceId],
-          });
-          ctx.queryClient.invalidateQueries({
-            queryKey: workspaceRecordKeys.byId(workspaceId),
-          });
-          ctx.queryClient.invalidateQueries({
-            queryKey: workspaceRepoKeys.byWorkspace(workspaceId),
-          });
-          ctx.queryClient.invalidateQueries({
-            queryKey: repoBranchKeys.byRepo(repoId),
-          });
-        },
-      });
-    },
-  },
-
-  GitPush: {
-    id: 'git-push',
-    label: 'Push',
-    icon: ArrowUpIcon,
-    shortcut: 'X U',
-    requiresTarget: ActionTargetType.GIT,
-    isVisible: (ctx) =>
-      ctx.hasWorkspace &&
-      ctx.hasGitRepos &&
-      ctx.hasOpenPR &&
-      ctx.hasUnpushedCommits,
-    execute: async (ctx, workspaceId, repoId) => {
-      const result = await workspacesApi.push(workspaceId, { repo_id: repoId });
-      if (!result.success) {
-        if (result.error?.type === 'force_push_required') {
-          throw new Error(
-            'Force push required. The remote branch has diverged.'
-          );
-        }
-        throw new Error('Failed to push changes');
-      }
-      invalidateWorkspaceQueries(ctx.queryClient, workspaceId);
     },
   },
 

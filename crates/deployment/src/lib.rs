@@ -7,7 +7,6 @@ use client_info::ClientInfo;
 use db::{DBService, models::workspace::WorkspaceError};
 use executors::executors::ExecutorError;
 use futures::{StreamExt, TryStreamExt};
-use git::{GitService, GitServiceError};
 use preview_proxy::PreviewProxyService;
 use relay_control::{RelayControl, signing::RelaySigningService};
 use relay_hosts::RelayHosts;
@@ -34,7 +33,6 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use trusted_key_auth::runtime::TrustedKeyAuthRuntime;
 use utils::sentry as sentry_utils;
-use worktree_manager::WorktreeError;
 
 #[derive(Debug, Clone, Copy, Error)]
 #[error("Remote client not configured")]
@@ -51,8 +49,6 @@ pub enum DeploymentError {
     #[error(transparent)]
     Sqlx(#[from] SqlxError),
     #[error(transparent)]
-    GitServiceError(#[from] GitServiceError),
-    #[error(transparent)]
     FilesystemWatcherError(#[from] FilesystemWatcherError),
     #[error(transparent)]
     Workspace(#[from] WorkspaceError),
@@ -64,8 +60,6 @@ pub enum DeploymentError {
     File(#[from] FileError),
     #[error(transparent)]
     Filesystem(#[from] FilesystemError),
-    #[error(transparent)]
-    Worktree(#[from] WorktreeError),
     #[error(transparent)]
     Event(#[from] EventError),
     #[error(transparent)]
@@ -89,8 +83,6 @@ pub trait Deployment: Clone + Send + Sync + 'static {
     fn analytics(&self) -> &Option<AnalyticsService>;
 
     fn container(&self) -> &impl ContainerService;
-
-    fn git(&self) -> &GitService;
 
     fn repo(&self) -> &RepoService;
 

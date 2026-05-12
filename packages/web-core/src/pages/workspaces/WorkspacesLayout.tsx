@@ -20,7 +20,6 @@ import {
   subscribeCreateModeSeedState,
 } from '@/features/create-mode/model/createModeSeedStore';
 import { ReviewProvider } from '@/shared/hooks/ReviewProvider';
-import { ChangesViewProvider } from '@/shared/hooks/ChangesViewProvider';
 import { WorkspacesSidebarContainer } from './WorkspacesSidebarContainer';
 import { LogsContentContainer } from './LogsContentContainer';
 import {
@@ -28,7 +27,6 @@ import {
   type WorkspacesMainContainerHandle,
 } from './WorkspacesMainContainer';
 import { RightSidebar } from './RightSidebar';
-import { ChangesPanelContainer } from './ChangesPanelContainer';
 import { CreateChatBoxContainer } from '@/shared/components/CreateChatBoxContainer';
 import { PreviewBrowserContainer } from './PreviewBrowserContainer';
 import { WorkspacesGuideDialog } from '@/shared/dialogs/shared/WorkspacesGuideDialog';
@@ -210,7 +208,6 @@ export function WorkspacesLayout() {
   if (isMobile) {
     const mobileContent = (
       <ReviewProvider workspaceId={selectedWorkspace?.id}>
-        <ChangesViewProvider>
           <div className="flex flex-col h-full min-h-0">
             {/* Workspaces tab */}
             <div
@@ -259,12 +256,6 @@ export function WorkspacesLayout() {
                 mobileTab !== 'changes' && 'hidden'
               )}
             >
-              {selectedWorkspace?.id && (
-                <ChangesPanelContainer
-                  className=""
-                  workspaceId={selectedWorkspace.id}
-                />
-              )}
             </div>
 
             {/* Logs tab */}
@@ -308,7 +299,6 @@ export function WorkspacesLayout() {
               )}
             </div>
           </div>
-        </ChangesViewProvider>
       </ReviewProvider>
     );
 
@@ -332,7 +322,6 @@ export function WorkspacesLayout() {
 
   const mainContent = (
     <ReviewProvider workspaceId={selectedWorkspace?.id}>
-      <ChangesViewProvider>
         <div className="flex h-full">
           <Group
             orientation="horizontal"
@@ -383,10 +372,7 @@ export function WorkspacesLayout() {
               >
                 {rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.CHANGES &&
                   selectedWorkspace?.id && (
-                    <ChangesPanelContainer
-                      className=""
-                      workspaceId={selectedWorkspace.id}
-                    />
+                    <div />
                   )}
                 {rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.LOGS && (
                   <LogsContentContainer className="" />
@@ -412,7 +398,6 @@ export function WorkspacesLayout() {
             </div>
           )}
         </div>
-      </ChangesViewProvider>
     </ReviewProvider>
   );
 

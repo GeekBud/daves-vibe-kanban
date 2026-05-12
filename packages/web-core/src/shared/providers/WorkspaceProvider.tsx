@@ -6,10 +6,7 @@ import { workspaceSummaryKeys } from '@/shared/hooks/workspaceSummaryKeys';
 import { useWorkspaceRecord } from '@/shared/hooks/useWorkspaceRecord';
 import { useWorkspaceRepo } from '@/shared/hooks/useWorkspaceRepo';
 import { useWorkspaceSessions } from '@/shared/hooks/useWorkspaceSessions';
-import { useGitHubComments } from '@/shared/hooks/useGitHubComments';
-import { useDiffStream } from '@/shared/hooks/useDiffStream';
 import { workspacesApi } from '@/shared/lib/api';
-import { useWorkspaceDiffStore } from '@/shared/stores/useWorkspaceDiffStore';
 import type { DiffStats } from 'shared/types';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import { useCurrentAppDestination } from '@/shared/hooks/useCurrentAppDestination';
@@ -54,44 +51,30 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     enabled: !isCreateMode,
   });
 
-  // TODO: Support multiple repos - currently only fetches comments from the primary repo.
-  const primaryRepoId = repos[0]?.id;
+  const gitHubComments: never[] = [];
+  const isGitHubCommentsLoading = false;
+  const showGitHubComments = false;
+  const setShowGitHubComments = (_v: boolean) => {};
+  const getGitHubCommentsForFile = (_f: string) => [] as never[];
+  const getGitHubCommentCountForFile = (_f: string) => 0;
+  const getFilesWithGitHubComments = () => new Set<string>();
+  const getFirstCommentLineForFile = (_f: string) => undefined;
 
-  const currentWorkspaceSummary = activeWorkspaces.find(
-    (w) => w.id === workspaceId
-  );
-  const hasPrAttached = !!currentWorkspaceSummary?.prStatus;
-
-  const {
-    gitHubComments,
-    isGitHubCommentsLoading,
-    showGitHubComments,
-    setShowGitHubComments,
-    getGitHubCommentsForFile,
-    getGitHubCommentCountForFile,
-    getFilesWithGitHubComments,
-    getFirstCommentLineForFile,
-  } = useGitHubComments({
-    workspaceId,
-    repoId: primaryRepoId,
-    enabled: !isCreateMode && hasPrAttached,
-  });
-
-  const { diffs } = useDiffStream(workspaceId ?? null, !isCreateMode);
+  const diffs: never[] = [];
 
   const diffPaths = useMemo(
     () =>
-      new Set(diffs.map((d) => d.newPath || d.oldPath || '').filter(Boolean)),
+      new Set(diffs.map((d: any) => d.newPath || d.oldPath || '').filter(Boolean)),
     [diffs]
   );
 
   const diffStats: DiffStats = useMemo(
     () => ({
-      files_changed: diffs.length,
-      lines_added: diffs.reduce((sum, d) => sum + (d.additions ?? 0), 0),
-      lines_removed: diffs.reduce((sum, d) => sum + (d.deletions ?? 0), 0),
+      files_changed: 0,
+      lines_added: 0,
+      lines_removed: 0,
     }),
-    [diffs]
+    []
   );
 
   const rafRef = useRef<number | null>(null);
@@ -130,9 +113,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         batchCountRef.current = 0;
-        useWorkspaceDiffStore
-          .getState()
-          .setWorkspaceDiffData(latestDiffDataRef.current);
       });
     }
     return () => {
@@ -157,7 +137,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
 
   useEffect(() => {
     return () => {
-      useWorkspaceDiffStore.getState().clearWorkspaceDiffData();
     };
   }, []);
 

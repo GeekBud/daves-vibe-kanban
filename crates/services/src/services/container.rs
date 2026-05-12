@@ -44,7 +44,6 @@ use executors::{
     profile::{ExecutorConfig, ExecutorProfileId},
 };
 use futures::{StreamExt, future, stream::BoxStream};
-use git::{GitService, GitServiceError};
 use json_patch::Patch;
 use sqlx::Error as SqlxError;
 use thiserror::Error;
@@ -55,7 +54,6 @@ use utils::{
     text::{git_branch_id, short_uuid},
 };
 use uuid::Uuid;
-use worktree_manager::WorktreeError;
 
 use crate::services::{execution_process, notification::NotificationService};
 pub type ContainerRef = String;
@@ -63,15 +61,9 @@ pub type ContainerRef = String;
 #[derive(Debug, Error)]
 pub enum ContainerError {
     #[error(transparent)]
-    GitServiceError(#[from] GitServiceError),
-    #[error(transparent)]
     Sqlx(#[from] SqlxError),
     #[error(transparent)]
     ExecutorError(#[from] ExecutorError),
-    #[error(transparent)]
-    Worktree(#[from] WorktreeError),
-    #[error(transparent)]
-    Workspace(#[from] WorkspaceError),
     #[error(transparent)]
     Session(#[from] SessionError),
     #[error(transparent)]
@@ -81,7 +73,7 @@ pub enum ContainerError {
     #[error("Failed to kill process: {0}")]
     KillFailed(std::io::Error),
     #[error(transparent)]
-    Other(#[from] AnyhowError), // Catches any unclassified errors
+    Other(#[from] AnyhowError),
 }
 
 #[async_trait]
@@ -89,8 +81,6 @@ pub trait ContainerService {
     fn msg_stores(&self) -> &Arc<RwLock<HashMap<Uuid, Arc<MsgStore>>>>;
 
     fn db(&self) -> &DBService;
-
-    fn git(&self) -> &GitService;
 
     fn notification_service(&self) -> &NotificationService;
 
@@ -299,31 +289,10 @@ pub trait ContainerService {
                 continue;
             }
             // Capture after-head commit OID per repository
-            if let Ok(ctx) = ExecutionProcess::load_context(&self.db().pool, process.id).await
-                && let Some(ref container_ref) = ctx.workspace.container_ref
+            if let Ok(_ctx) = ExecutionProcess::load_context(&self.db().pool, process.id).await
+                && let Some(ref _container_ref) = _ctx.workspace.container_ref
             {
-                let workspace_root = PathBuf::from(container_ref);
-                for repo in &ctx.repos {
-                    let repo_path = workspace_root.join(&repo.name);
-                    if let Ok(head) = self.git().get_head_info(&repo_path)
-                        && let Err(err) = ExecutionProcessRepoState::update_after_head_commit(
-                            &self.db().pool,
-                            process.id,
-                            repo.id,
-                            &head.oid,
-                        )
-                        .await
-                    {
-                        tracing::warn!(
-                            "Failed to update after_head_commit for repo {} on process {}: {}",
-                            repo.id,
-                            process.id,
-                            err
-                        );
-                    }
-                }
             }
-            // Process marked as failed
             tracing::info!("Marked orphaned execution process {} as failed", process.id);
         }
         Ok(())
@@ -344,21 +313,7 @@ pub trait ContainerService {
 
             // Fallback to base branch commit OID
             if before.is_none() {
-                let repo_path = std::path::Path::new(row.repo_path.as_deref().unwrap_or_default());
-                match self
-                    .git()
-                    .get_branch_oid(repo_path, row.target_branch.as_str())
-                {
-                    Ok(oid) => before = Some(oid),
-                    Err(e) => {
-                        tracing::warn!(
-                            "Backfill: Failed to resolve base branch OID for workspace {} (branch {}): {}",
-                            row.workspace_id,
-                            row.target_branch,
-                            e
-                        );
-                    }
-                }
+                let _repo_path = std::path::Path::new(row.repo_path.as_deref().unwrap_or_default());
             }
 
             if let Some(before_oid) = before
@@ -673,33 +628,7 @@ pub trait ContainerService {
             .unwrap_or(false);
 
         for repo in &repos {
-            let repo_state = repo_states.iter().find(|s| s.repo_id == repo.id);
-            let target_oid = match repo_state.and_then(|s| s.before_head_commit.clone()) {
-                Some(oid) => Some(oid),
-                None => {
-                    ExecutionProcess::find_prev_after_head_commit(
-                        pool,
-                        session_id,
-                        target_process_id,
-                        repo.id,
-                    )
-                    .await?
-                }
-            };
-
-            let worktree_path = workspace_dir.join(&repo.name);
-            if let Some(oid) = target_oid {
-                self.git().reconcile_worktree_to_commit(
-                    &worktree_path,
-                    &oid,
-                    git::WorktreeResetOptions::new(
-                        perform_git_reset,
-                        force_when_dirty,
-                        is_dirty,
-                        perform_git_reset,
-                    ),
-                );
-            }
+            let _repo_state = repo_states.iter().find(|s| s.repo_id == repo.id);
         }
 
         self.try_stop(&workspace, false).await;
@@ -1154,11 +1083,6 @@ pub trait ContainerService {
         // Capture current HEAD per repository as the "before" commit for this execution
         let repositories =
             WorkspaceRepo::find_repos_for_workspace(&self.db().pool, workspace.id).await?;
-        if repositories.is_empty() {
-            return Err(ContainerError::Other(anyhow!(
-                "Workspace has no repositories configured"
-            )));
-        }
 
         let workspace_root = workspace
             .container_ref
@@ -1168,8 +1092,8 @@ pub trait ContainerService {
 
         let mut repo_states = Vec::with_capacity(repositories.len());
         for repo in &repositories {
-            let repo_path = workspace_root.join(&repo.name);
-            let before_head_commit = self.git().get_head_info(&repo_path).ok().map(|h| h.oid);
+            let _repo_path = workspace_root.join(&repo.name);
+            let before_head_commit = None;
             repo_states.push(CreateExecutionProcessRepoState {
                 repo_id: repo.id,
                 before_head_commit,

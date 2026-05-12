@@ -9,7 +9,6 @@ use client_info::ClientInfo;
 use db::DBService;
 use deployment::{Deployment, DeploymentError, RelayHostsNotConfigured, RemoteClientNotConfigured};
 use executors::profile::ExecutorConfigs;
-use git::GitService;
 use preview_proxy::PreviewProxyService;
 use relay_control::{RelayControl, signing::RelaySigningService};
 use relay_hosts::RelayHosts;
@@ -26,7 +25,6 @@ use services::services::{
     file_search::FileSearchCache,
     filesystem::FilesystemService,
     oauth_credentials::OAuthCredentials,
-    pr_monitor::PrMonitorService,
     queued_message::QueuedMessageService,
     remote_client::{RemoteClient, RemoteClientError},
     repo::RepoService,
@@ -40,7 +38,6 @@ use utils::{
 };
 use uuid::Uuid;
 use workspace_manager::WorkspaceManager;
-use worktree_manager::WorktreeManager;
 
 use crate::{container::LocalContainerService, pty::PtyService};
 mod command;
@@ -56,7 +53,6 @@ pub struct LocalDeployment {
     workspace_manager: WorkspaceManager,
     analytics: Option<AnalyticsService>,
     container: LocalContainerService,
-    git: GitService,
     repo: RepoService,
     file: FileService,
     filesystem: FilesystemService,
@@ -119,15 +115,12 @@ impl Deployment for LocalDeployment {
         // Always save config (may have been migrated or version updated)
         save_config_to_file(&raw_config, &config_path()).await?;
 
-        if let Some(workspace_dir) = &raw_config.workspace_dir {
-            let path = utils::path::expand_tilde(workspace_dir);
-            WorktreeManager::set_workspace_dir_override(path);
+        if let Some(_workspace_dir) = &raw_config.workspace_dir {
         }
 
         let config = Arc::new(RwLock::new(raw_config));
         let user_id = generate_user_id();
         let analytics = AnalyticsConfig::new().map(AnalyticsService::new);
-        let git = GitService::new();
         let repo = RepoService::new();
         let msg_stores = Arc::new(RwLock::new(HashMap::new()));
         let filesystem = FilesystemService::new();
@@ -241,7 +234,6 @@ impl Deployment for LocalDeployment {
             workspace_manager.clone(),
             msg_stores.clone(),
             config.clone(),
-            git.clone(),
             file.clone(),
             analytics_ctx,
             approvals.clone(),
@@ -274,9 +266,8 @@ impl Deployment for LocalDeployment {
                 user_id: user_id.clone(),
                 analytics_service: s.clone(),
             });
-            let container = container.clone();
-            let rc = remote_client.clone().ok();
-            PrMonitorService::spawn(db, analytics, container, rc, pr_sync_notify.clone()).await;
+            let _container = container.clone();
+            let _rc = remote_client.clone().ok();
         }
 
         let deployment = Self {
@@ -286,7 +277,6 @@ impl Deployment for LocalDeployment {
             workspace_manager,
             analytics,
             container,
-            git,
             repo,
             file,
             filesystem,
@@ -332,10 +322,6 @@ impl Deployment for LocalDeployment {
 
     fn container(&self) -> &impl ContainerService {
         &self.container
-    }
-
-    fn git(&self) -> &GitService {
-        &self.git
     }
 
     fn repo(&self) -> &RepoService {

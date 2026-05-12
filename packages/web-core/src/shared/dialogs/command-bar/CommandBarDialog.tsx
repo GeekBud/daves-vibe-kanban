@@ -19,8 +19,6 @@ import {
   type ActionDefinition,
 } from '@/shared/types/actions';
 import { useActionVisibilityContext } from '@/shared/hooks/useActionVisibilityContext';
-import type { SelectionPage } from './SelectionDialog';
-import type { RepoSelectionResult } from './selections/repoSelection';
 import { useCommandBarState } from './commandBar/useCommandBarState';
 import { useResolvedPage } from './commandBar/useResolvedPage';
 import { useIssueSelectionStore } from '@/shared/stores/useIssueSelectionStore';
@@ -124,20 +122,7 @@ function CommandBarContent({
         if (!repoId && repos.length === 1) {
           repoId = repos[0].id;
         } else if (!repoId && repos.length > 1) {
-          const { SelectionDialog } = await import('./SelectionDialog');
-          const { buildRepoSelectionPages } = await import(
-            './selections/repoSelection'
-          );
-          const result = await SelectionDialog.show({
-            initialPageId: 'selectRepo',
-            pages: buildRepoSelectionPages(repos) as Record<
-              string,
-              SelectionPage
-            >,
-          });
-          if (result && typeof result === 'object' && 'repoId' in result) {
-            repoId = (result as RepoSelectionResult).repoId;
-          }
+          repoId = repos[0].id;
         }
         if (repoId) {
           executeAction(effect.action, effectiveWorkspaceId, repoId);

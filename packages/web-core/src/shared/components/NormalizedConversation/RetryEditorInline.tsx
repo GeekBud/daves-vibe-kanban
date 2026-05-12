@@ -10,7 +10,6 @@ import { attachmentsApi } from '@/shared/lib/api';
 import type { WorkspaceWithSession } from '@/shared/types/attempt';
 import { useWorkspaceExecution } from '@/shared/hooks/useWorkspaceExecution';
 import { useUserSystem } from '@/shared/hooks/useUserSystem';
-import { useBranchStatus } from '@/shared/hooks/useBranchStatus';
 import { useVariant } from '@/shared/hooks/useVariant';
 import { useRetryProcess } from '@/shared/hooks/useRetryProcess';
 import { executorConfigFromAction } from '@/shared/lib/executor';
@@ -30,7 +29,6 @@ export function RetryEditorInline({
   const { t } = useTranslation(['common']);
   const workspaceId = attempt.id;
   const { isAttemptRunning, attemptData } = useWorkspaceExecution(workspaceId);
-  const { data: branchStatus } = useBranchStatus(workspaceId);
   const { profiles } = useUserSystem();
 
   const [message, setMessage] = useState(initialContent);
@@ -75,7 +73,6 @@ export function RetryEditorInline({
       executor: processProfile.executor,
       variant: selectedVariant,
       executionProcessId,
-      branchStatus,
       processes: attemptData.processes,
     });
   }, [
@@ -85,7 +82,6 @@ export function RetryEditorInline({
     processProfile,
     selectedVariant,
     executionProcessId,
-    branchStatus,
     attemptData.processes,
   ]);
 

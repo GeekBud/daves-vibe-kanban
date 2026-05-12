@@ -10,14 +10,6 @@ import {
 } from '@/shared/lib/fileTreeUtils';
 import { usePersistedCollapsedPaths } from '@/shared/stores/useUiPreferencesStore';
 import { useFileInView } from '@/shared/stores/useFileInViewStore';
-import {
-  useShowGitHubComments,
-  useSetShowGitHubComments,
-  useGetGitHubCommentCountForFile,
-  useGetFilesWithGitHubComments,
-  useGetFirstCommentLineForFile,
-  useIsGitHubCommentsLoading,
-} from '@/shared/stores/useWorkspaceDiffStore';
 import { useChangesView } from '@/shared/hooks/useChangesView';
 import { getFileIcon } from '@/shared/lib/fileTypeIcon';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -41,12 +33,12 @@ export function FileTreeContainer({
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedPaths, setCollapsedPaths] =
     usePersistedCollapsedPaths(workspaceId);
-  const showGitHubComments = useShowGitHubComments();
-  const setShowGitHubComments = useSetShowGitHubComments();
-  const getGitHubCommentCountForFile = useGetGitHubCommentCountForFile();
-  const getFilesWithGitHubComments = useGetFilesWithGitHubComments();
-  const getFirstCommentLineForFile = useGetFirstCommentLineForFile();
-  const isGitHubCommentsLoading = useIsGitHubCommentsLoading();
+  const showGitHubComments = false;
+  const setShowGitHubComments = (_v: boolean) => {};
+  const getGitHubCommentCountForFile = (_f: string) => 0;
+  const getFilesWithGitHubComments = () => new Set<string>();
+  const getFirstCommentLineForFile = (_f: string) => undefined;
+  const isGitHubCommentsLoading = false;
 
   const { selectedFilePath, scrollToFile } = useChangesView();
   const fileInView = useFileInView();
@@ -148,7 +140,7 @@ export function FileTreeContainer({
     return sortDiffs(diffs)
       .map((d) => d.newPath || d.oldPath || '')
       .filter((diffPath) =>
-        ghFiles.some(
+        Array.from(ghFiles).some(
           (ghPath) => diffPath === ghPath || diffPath.endsWith('/' + ghPath)
         )
       );

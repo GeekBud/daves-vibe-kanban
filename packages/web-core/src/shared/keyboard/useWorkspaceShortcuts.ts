@@ -65,10 +65,6 @@ export function useWorkspaceShortcuts() {
   useHotkeys('v>s', () => execute(Actions.ToggleLeftSidebar), OPTIONS);
   useHotkeys('v>h', () => execute(Actions.ToggleLeftMainPanel), OPTIONS);
 
-  useHotkeys('x>p', () => execute(Actions.GitCreatePR), OPTIONS);
-  useHotkeys('x>m', () => execute(Actions.GitMerge), OPTIONS);
-  useHotkeys('x>r', () => execute(Actions.GitRebase), OPTIONS);
-  useHotkeys('x>u', () => execute(Actions.GitPush), OPTIONS);
 
   useHotkeys('y>p', () => execute(Actions.CopyWorkspacePath), OPTIONS);
   useHotkeys('y>l', () => execute(Actions.CopyRawLogs), OPTIONS);

@@ -3,10 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { FileTreeContainer } from './FileTreeContainer';
 import { ProcessListContainer } from './ProcessListContainer';
 import { PreviewControlsContainer } from './PreviewControlsContainer';
-import { GitPanelContainer } from './GitPanelContainer';
 import { TerminalPanelContainer } from '@/shared/components/TerminalPanelContainer';
 import { WorkspaceNotesContainer } from './WorkspaceNotesContainer';
-import { useDiffs } from '@/shared/stores/useWorkspaceDiffStore';
 import { ArrowsOutSimpleIcon } from '@phosphor-icons/react';
 import { useLogsPanel } from '@/shared/hooks/useLogsPanel';
 import type { RepoWithTargetBranch, Workspace } from 'shared/types';
@@ -44,7 +42,6 @@ export const RightSidebar = memo(function RightSidebar({
   repos,
 }: RightSidebarProps) {
   const { t } = useTranslation(['tasks', 'common']);
-  const diffs = useDiffs();
   const isTerminalVisible = useUiPreferencesStore((s) => s.isTerminalVisible);
   const { expandTerminal, isTerminalExpanded } = useLogsPanel();
 
@@ -91,19 +88,6 @@ export const RightSidebar = memo(function RightSidebar({
   const sections: SectionDef[] = useMemo(() => {
     const result: SectionDef[] = [
       {
-        title: 'Git',
-        persistKey: PERSIST_KEYS.gitPanelRepositories,
-        visible: true,
-        expanded: gitExpanded,
-        content: (
-          <GitPanelContainer
-            selectedWorkspace={selectedWorkspace}
-            repos={repos}
-          />
-        ),
-        actions: [],
-      },
-      {
         title: 'Terminal',
         persistKey: PERSIST_KEYS.terminalSection,
         visible: isTerminalVisible && !isTerminalExpanded,
@@ -133,7 +117,7 @@ export const RightSidebar = memo(function RightSidebar({
               <FileTreeContainer
                 key={selectedWorkspace.id}
                 workspaceId={selectedWorkspace.id}
-                diffs={diffs}
+                diffs={[]}
                 className=""
               />
             ),
@@ -177,7 +161,6 @@ export const RightSidebar = memo(function RightSidebar({
     rightMainPanelMode,
     selectedWorkspace,
     repos,
-    diffs,
     gitExpanded,
     terminalExpanded,
     notesExpanded,

@@ -5,9 +5,8 @@ edition = "2024"
 
 [dependencies]
 db = { path = "../db" }
-git = { path = "../git" }
 utils = { path = "../utils" }
-worktree-manager = { path = "../worktree-manager" }
+dirs = "5.0"
 sqlx = "0.8.6"
 tokio = { workspace = true }
 thiserror = { workspace = true }

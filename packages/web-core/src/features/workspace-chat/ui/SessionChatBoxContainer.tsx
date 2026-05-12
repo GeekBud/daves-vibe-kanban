@@ -29,11 +29,8 @@ import { useSessionQueueInteraction } from '../model/hooks/useSessionQueueIntera
 import { useSessionSend } from '../model/hooks/useSessionSend';
 import { useSessionAttachments } from '../model/hooks/useSessionAttachments';
 import { useMessageEditRetry } from '../model/hooks/useMessageEditRetry';
-import { useBranchStatus } from '@/shared/hooks/useBranchStatus';
-import { useWorkspaceBranch } from '../model/hooks/useWorkspaceBranch';
 import { useApprovalMutation } from '../model/hooks/useApprovalMutation';
 import { useApprovals } from '@/shared/hooks/useApprovals';
-import { ResolveConflictsDialog } from '@/shared/dialogs/tasks/ResolveConflictsDialog';
 import { workspaceSummaryKeys } from '@/shared/hooks/workspaceSummaryKeys';
 import { buildAgentPrompt } from '@/shared/lib/promptMessage';
 import { formatDateShortWithTime } from '@/shared/lib/date';
@@ -59,8 +56,6 @@ import {
 } from '@/shared/types/actions';
 import { SettingsDialog } from '@/shared/dialogs/settings/SettingsDialog';
 import { useActionVisibilityContext } from '@/shared/hooks/useActionVisibilityContext';
-import { PrCommentsDialog } from '@/shared/dialogs/tasks/PrCommentsDialog';
-import type { NormalizedComment } from '@vibe/ui/components/pr-comment-node';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import { sessionsApi } from '@/shared/lib/api';
 import { RenameSessionDialog } from '@vibe/ui/components/RenameSessionDialog';
@@ -318,48 +313,13 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
     answerError,
   } = useApprovalMutation();
 
-  // Branch status for edit retry and conflict detection
-  const { data: branchStatus } = useBranchStatus(workspaceId);
+  const hasConflicts = false;
 
-  // Derive conflict state from branch status
-  const hasConflicts = useMemo(() => {
-    return (
-      branchStatus?.some((r) => (r.conflicted_files?.length ?? 0) > 0) ?? false
-    );
-  }, [branchStatus]);
+  const conflictedFilesCount = 0;
 
-  const conflictedFilesCount = useMemo(() => {
-    return (
-      branchStatus?.reduce(
-        (sum, r) => sum + (r.conflicted_files?.length ?? 0),
-        0
-      ) ?? 0
-    );
-  }, [branchStatus]);
-
-  // Get workspace branch for conflict resolution dialog
-  const { branch: attemptBranch } = useWorkspaceBranch(workspaceId);
-
-  // Find the first repo with conflicts (for the resolve dialog)
-  const repoWithConflicts = useMemo(
-    () =>
-      branchStatus?.find(
-        (r) => r.is_rebase_in_progress || (r.conflicted_files?.length ?? 0) > 0
-      ),
-    [branchStatus]
-  );
 
   const handleResolveConflicts = useCallback(() => {
-    if (!workspaceId || !repoWithConflicts) return;
-    ResolveConflictsDialog.show({
-      workspaceId,
-      conflictOp: repoWithConflicts.conflict_op ?? 'rebase',
-      sourceBranch: attemptBranch,
-      targetBranch: repoWithConflicts.target_branch_name,
-      conflictedFiles: repoWithConflicts.conflicted_files ?? [],
-      repoName: repoWithConflicts.repo_name,
-    });
-  }, [workspaceId, repoWithConflicts, attemptBranch]);
+  }, [workspaceId]);
 
   // User profiles, config preference, and latest executor from processes
   const { profiles, config, capabilities } = useUserSystem();
@@ -705,14 +665,13 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
       message: localMessage,
       executorConfig,
       executionProcessId: editContext.activeEdit.processId,
-      branchStatus,
+      branchStatus: undefined,
       processes,
     });
   }, [
     editContext.activeEdit,
     localMessage,
     executorConfig,
-    branchStatus,
     processes,
     editRetryMutation,
   ]);
@@ -738,33 +697,6 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
     if (!workspaceId) return;
     const repoId = repos[0]?.id;
     if (!repoId) return;
-
-    const result = await PrCommentsDialog.show({
-      workspaceId: workspaceId,
-      repoId,
-    });
-    if (result.comments.length > 0) {
-      const markdownBlocks = result.comments.map((comment) => {
-        const payload: NormalizedComment = {
-          id:
-            comment.comment_type === 'general'
-              ? comment.id
-              : comment.id.toString(),
-          comment_type: comment.comment_type,
-          author: comment.author,
-          body: comment.body,
-          created_at: comment.created_at,
-          url: comment.url,
-          ...(comment.comment_type === 'review' && {
-            path: comment.path,
-            line: comment.line != null ? Number(comment.line) : null,
-            diff_hunk: comment.diff_hunk,
-          }),
-        };
-        return '```gh-comment\n' + JSON.stringify(payload, null, 2) + '\n```';
-      });
-      handleInsertMarkdown(markdownBlocks.join('\n\n'));
-    }
   }, [workspaceId, repos, handleInsertMarkdown]);
 
   // Toolbar actions handler

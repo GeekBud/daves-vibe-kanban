@@ -170,19 +170,8 @@ pub async fn get_workspace_summaries(
 
 /// Compute diff stats for a workspace.
 pub async fn compute_workspace_diff_stats(
-    deployment: &DeploymentImpl,
-    workspace: &Workspace,
+    _deployment: &DeploymentImpl,
+    _workspace: &Workspace,
 ) -> Option<DiffStats> {
-    let stats = services::services::diff_stream::compute_diff_stats(
-        &deployment.db().pool,
-        deployment.git(),
-        workspace,
-    )
-    .await?;
-
-    Some(DiffStats {
-        files_changed: stats.files_changed,
-        lines_added: stats.lines_added,
-        lines_removed: stats.lines_removed,
-    })
+    None
 }

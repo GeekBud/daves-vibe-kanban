@@ -10,8 +10,6 @@ use db::models::{
 };
 use deployment::{DeploymentError, RelayHostsNotConfigured, RemoteClientNotConfigured};
 use executors::{command::CommandBuildError, executors::ExecutorError};
-use git::GitServiceError;
-use git_host::GitHostError;
 use local_deployment::pty::PtyError;
 use relay_hosts::{
     RelayApiError, RelayConnectionError, RelayHostLookupError, RelayPairingClientError,
@@ -27,8 +25,6 @@ use services::services::{
 use thiserror::Error;
 use trusted_key_auth::error::TrustedKeyAuthError;
 use utils::response::ApiResponse;
-use workspace_manager::WorkspaceError as WorkspaceManagerError;
-use worktree_manager::WorktreeError;
 
 #[derive(Debug, Error, ts_rs::TS)]
 #[ts(type = "string")]
@@ -44,10 +40,6 @@ pub enum ApiError {
     #[error(transparent)]
     ExecutionProcess(#[from] ExecutionProcessError),
     #[error(transparent)]
-    GitService(#[from] GitServiceError),
-    #[error(transparent)]
-    GitHost(#[from] GitHostError),
-    #[error(transparent)]
     Deployment(#[from] DeploymentError),
     #[error(transparent)]
     Container(ContainerError),
@@ -55,8 +47,6 @@ pub enum ApiError {
     Executor(#[from] ExecutorError),
     #[error(transparent)]
     Database(#[from] sqlx::Error),
-    #[error(transparent)]
-    Worktree(WorktreeError),
     #[error(transparent)]
     Config(#[from] ConfigError),
     #[error(transparent)]
@@ -111,39 +101,17 @@ impl From<RelayHostsNotConfigured> for ApiError {
     }
 }
 
-impl From<WorkspaceManagerError> for ApiError {
-    fn from(err: WorkspaceManagerError) -> Self {
+impl From<workspace_manager::WorkspaceError> for ApiError {
+    fn from(err: workspace_manager::WorkspaceError) -> Self {
         match err {
-            WorkspaceManagerError::Database(err) => ApiError::Database(err),
-            WorkspaceManagerError::Repo(err) => ApiError::Repo(err),
-            WorkspaceManagerError::Worktree(err) => ApiError::Worktree(err),
-            WorkspaceManagerError::GitService(err) => ApiError::GitService(err),
-            WorkspaceManagerError::Io(err) => ApiError::Io(err),
-            WorkspaceManagerError::WorkspaceNotFound => {
+            workspace_manager::WorkspaceError::Database(err) => ApiError::Database(err),
+            workspace_manager::WorkspaceError::Io(err) => ApiError::Io(err),
+            workspace_manager::WorkspaceError::WorkspaceNotFound => {
                 ApiError::Workspace(WorkspaceError::WorkspaceNotFound)
             }
-            WorkspaceManagerError::RepoAlreadyAttached => {
-                ApiError::Conflict("Repository already attached to workspace".to_string())
-            }
-            WorkspaceManagerError::BranchNotFound { repo_name, branch } => {
-                ApiError::BadRequest(format!(
-                    "Branch '{}' does not exist in repository '{}'",
-                    branch, repo_name
-                ))
-            }
-            WorkspaceManagerError::NoRepositories => {
+            workspace_manager::WorkspaceError::NoRepositories => {
                 ApiError::BadRequest("Workspace has no repositories configured".to_string())
             }
-            WorkspaceManagerError::PartialCreation(msg) => ApiError::Conflict(msg),
-        }
-    }
-}
-
-impl From<WorktreeError> for ApiError {
-    fn from(err: WorktreeError) -> Self {
-        match err {
-            WorktreeError::GitService(e) => ApiError::GitService(e),
-            other => ApiError::Worktree(other),
         }
     }
 }
@@ -151,12 +119,9 @@ impl From<WorktreeError> for ApiError {
 impl From<ContainerError> for ApiError {
     fn from(err: ContainerError) -> Self {
         match err {
-            ContainerError::GitServiceError(e) => ApiError::GitService(e),
-            ContainerError::Workspace(e) => ApiError::Workspace(e),
             ContainerError::Session(e) => ApiError::Session(e),
             ContainerError::ExecutionProcess(e) => ApiError::ExecutionProcess(e),
             ContainerError::ExecutorError(e) => ApiError::Executor(e),
-            ContainerError::Worktree(e) => e.into(),
             other => ApiError::Container(other),
         }
     }
@@ -374,53 +339,6 @@ impl IntoResponse for ApiError {
             }
             ApiError::ExecutionProcess(_) => ErrorInfo::internal("ExecutionProcessError"),
 
-            ApiError::GitService(GitServiceError::MergeConflicts { message, .. }) => {
-                ErrorInfo::conflict("GitServiceError", message.clone())
-            }
-            ApiError::GitService(GitServiceError::RebaseInProgress) => ErrorInfo::conflict(
-                "GitServiceError",
-                "A rebase is already in progress. Resolve conflicts or abort the rebase, then retry.",
-            ),
-            ApiError::GitService(GitServiceError::BranchNotFound(branch)) => ErrorInfo::not_found(
-                "GitServiceError",
-                format!(
-                    "Branch '{}' not found. Try changing the target branch.",
-                    branch
-                ),
-            ),
-            ApiError::GitService(GitServiceError::BranchesDiverged(msg)) => ErrorInfo::conflict(
-                "GitServiceError",
-                format!(
-                    "{} Rebase onto the target branch first, then retry the merge.",
-                    msg
-                ),
-            ),
-            ApiError::GitService(GitServiceError::WorktreeDirty(branch, files)) => {
-                ErrorInfo::conflict(
-                    "GitServiceError",
-                    format!(
-                        "Branch '{}' has uncommitted changes ({}). Commit or revert them before retrying.",
-                        branch, files
-                    ),
-                )
-            }
-            ApiError::GitService(GitServiceError::GitCLI(git::GitCliError::AuthFailed(msg))) => {
-                ErrorInfo::with_status(
-                    StatusCode::UNAUTHORIZED,
-                    "GitServiceError",
-                    format!(
-                        "{}. Check your git credentials or SSH keys and try again.",
-                        msg
-                    ),
-                )
-            }
-            ApiError::GitService(e) => ErrorInfo::with_status(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "GitServiceError",
-                format!("Git operation failed: {}", e),
-            ),
-            ApiError::GitHost(_) => ErrorInfo::internal("GitHostError"),
-
             ApiError::File(FileError::TooLarge(size, max)) => ErrorInfo::with_status(
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "FileTooLarge",
@@ -494,11 +412,6 @@ impl IntoResponse for ApiError {
             ApiError::Executor(_) => ErrorInfo::internal("ExecutorError"),
             ApiError::CommandBuilder(_) => ErrorInfo::internal("CommandBuildError"),
             ApiError::Database(_) => ErrorInfo::internal("DatabaseError"),
-            ApiError::Worktree(err) => ErrorInfo::with_status(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "WorktreeError",
-                format!("Worktree operation failed: {}", err),
-            ),
             ApiError::Config(_) => ErrorInfo::internal("ConfigError"),
             ApiError::Io(_) => ErrorInfo::internal("IoError"),
             ApiError::WebRtc(err) => match err {
@@ -559,15 +472,9 @@ impl From<RepoServiceError> for ApiError {
             RepoServiceError::PathNotDirectory(path) => {
                 ApiError::BadRequest(format!("Path is not a directory: {}", path.display()))
             }
-            RepoServiceError::NotGitRepository(path) => {
-                ApiError::BadRequest(format!("Path is not a git repository: {}", path.display()))
-            }
             RepoServiceError::NotFound => ApiError::BadRequest("Repository not found".to_string()),
             RepoServiceError::DirectoryAlreadyExists(path) => {
                 ApiError::BadRequest(format!("Directory already exists: {}", path.display()))
-            }
-            RepoServiceError::Git(git_err) => {
-                ApiError::BadRequest(format!("Git error: {}", git_err))
             }
             RepoServiceError::InvalidFolderName(name) => {
                 ApiError::BadRequest(format!("Invalid folder name: {}", name))

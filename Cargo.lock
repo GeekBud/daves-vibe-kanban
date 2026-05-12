@@ -1854,7 +1854,6 @@ dependencies = [
  "db",
  "executors",
  "futures",
- "git",
  "preview-proxy",
  "relay-control",
  "relay-hosts",
@@ -1867,7 +1866,6 @@ dependencies = [
  "tokio-util",
  "trusted-key-auth",
  "utils",
- "worktree-manager",
 ]
 
 [[package]]
@@ -2546,7 +2544,6 @@ dependencies = [
  "eventsource-stream",
  "futures",
  "futures-io",
- "git",
  "json-patch 2.0.0",
  "jsonc-parser",
  "lru 0.12.5",
@@ -3198,54 +3195,6 @@ dependencies = [
  "libc",
  "system-deps",
  "winapi",
-]
-
-[[package]]
-name = "git"
-version = "0.1.42"
-dependencies = [
- "chrono",
- "dirs 5.0.1",
- "git2",
- "serde",
- "tempfile",
- "thiserror 2.0.18",
- "tracing",
- "ts-rs 11.0.1",
- "utils",
-]
-
-[[package]]
-name = "git-host"
-version = "0.1.42"
-dependencies = [
- "async-trait",
- "backon",
- "chrono",
- "db",
- "enum_dispatch",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "ts-rs 11.0.1",
- "url",
- "utils",
-]
-
-[[package]]
-name = "git2"
-version = "0.20.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b88256088d75a56f8ecfa070513a775dd9107f6530ef14919dac831af9cfe2b"
-dependencies = [
- "bitflags 2.11.0",
- "libc",
- "libgit2-sys",
- "log",
- "url",
 ]
 
 [[package]]
@@ -4422,18 +4371,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
 
 [[package]]
-name = "libgit2-sys"
-version = "0.18.3+1.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9b3acc4b91781bb0b3386669d325163746af5f6e4f73e6d2d630e09a35f3487"
-dependencies = [
- "cc",
- "libc",
- "libz-sys",
- "pkg-config",
-]
-
-[[package]]
 name = "libloading"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4484,18 +4421,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libz-sys"
-version = "1.1.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52f4c29e2a68ac30c9087e1b772dc9f44a2b66ed44edf2266cf2be9b03dafc1"
-dependencies = [
- "cc",
- "libc",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4530,7 +4455,6 @@ dependencies = [
  "embedded-ssh",
  "executors",
  "futures",
- "git",
  "globwalk",
  "portable-pty",
  "preview-proxy",
@@ -4552,7 +4476,6 @@ dependencies = [
  "utils",
  "uuid",
  "workspace-manager",
- "worktree-manager",
 ]
 
 [[package]]
@@ -7949,8 +7872,6 @@ dependencies = [
  "embedded-ssh",
  "executors",
  "futures-util",
- "git",
- "git-host",
  "http",
  "local-deployment",
  "mime_guess",
@@ -7993,7 +7914,6 @@ dependencies = [
  "utils",
  "uuid",
  "workspace-manager",
- "worktree-manager",
  "ws-bridge",
 ]
 
@@ -8013,8 +7933,6 @@ dependencies = [
  "executors",
  "fst",
  "futures",
- "git",
- "git-host",
  "ignore",
  "indicatif",
  "json-patch 2.0.0",
@@ -8044,7 +7962,6 @@ dependencies = [
  "url",
  "utils",
  "uuid",
- "worktree-manager",
 ]
 
 [[package]]
@@ -11700,27 +11617,13 @@ name = "workspace-manager"
 version = "0.1.42"
 dependencies = [
  "db",
- "git",
+ "dirs 5.0.1",
  "sqlx",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
  "utils",
  "uuid",
- "worktree-manager",
-]
-
-[[package]]
-name = "worktree-manager"
-version = "0.1.42"
-dependencies = [
- "dunce",
- "git",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "utils",
 ]
 
 [[package]]

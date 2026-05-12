@@ -11,7 +11,7 @@ use db::models::{
 };
 use deployment::Deployment;
 use serde::Deserialize;
-use services::services::{container::ContainerService, diff_stream, remote_sync};
+use services::services::container::ContainerService;
 use sqlx::Error as SqlxError;
 use utils::response::ApiResponse;
 use workspace_manager::WorkspaceManager;
@@ -63,21 +63,7 @@ pub async fn update_workspace(
     if (request.archived.is_some() || request.name.is_some())
         && let Ok(client) = deployment.remote_client()
     {
-        let ws = updated.clone();
-        let name = request.name.clone();
-        let archived = request.archived;
-        let stats =
-            diff_stream::compute_diff_stats(&deployment.db().pool, deployment.git(), &ws).await;
-        tokio::spawn(async move {
-            remote_sync::sync_workspace_to_remote(
-                &client,
-                ws.id,
-                name.map(Some),
-                archived,
-                stats.as_ref(),
-            )
-            .await;
-        });
+        let _ws = updated.clone();
     }
 
     if is_archiving && let Err(e) = deployment.container().archive_workspace(workspace.id).await {
@@ -177,7 +163,7 @@ pub async fn delete_workspace(
         }
     }
 
-    WorkspaceManager::spawn_workspace_deletion_cleanup(deletion_context, query.delete_branches);
+    WorkspaceManager::spawn_workspace_deletion_cleanup(deletion_context);
 
     Ok((StatusCode::ACCEPTED, ResponseJson(ApiResponse::success(()))))
 }

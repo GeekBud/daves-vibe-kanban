@@ -6,7 +6,6 @@ use std::{
 
 use db::models::repo::{SearchMatchType, SearchResult};
 use fst::{Map, MapBuilder};
-use git::GitService;
 use ignore::WalkBuilder;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
@@ -15,7 +14,7 @@ use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 use ts_rs::TS;
 
-use super::file_ranker::{FileRanker, FileStats};
+use super::file_ranker::FileRanker;
 
 /// Search mode for different use cases
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -65,13 +64,11 @@ enum FileIndexError {
     StripPrefix(#[from] std::path::StripPrefixError),
 }
 
-/// Cached repository data with FST index and git stats
 #[derive(Clone)]
 pub struct CachedRepo {
     pub head_sha: String,
     pub fst_index: Map<Vec<u8>>,
     pub indexed_files: Vec<IndexedFile>,
-    pub stats: Arc<FileStats>,
     pub build_ts: Instant,
 }
 
@@ -85,7 +82,6 @@ pub enum CacheError {
 /// File search cache with FST indexing
 pub struct FileSearchCache {
     cache: Cache<PathBuf, CachedRepo>,
-    git_service: GitService,
     file_ranker: FileRanker,
     build_queue: mpsc::UnboundedSender<PathBuf>,
 }
@@ -101,17 +97,13 @@ impl FileSearchCache {
             .build();
 
         let cache_for_worker = cache.clone();
-        let git_service = GitService::new();
         let file_ranker = FileRanker::new();
 
-        // Spawn background worker
-        let worker_git_service = git_service.clone();
         let worker_file_ranker = file_ranker.clone();
         tokio::spawn(async move {
             Self::background_worker(
                 build_receiver,
                 cache_for_worker,
-                worker_git_service,
                 worker_file_ranker,
             )
             .await;
@@ -119,7 +111,6 @@ impl FileSearchCache {
 
         Self {
             cache,
-            git_service,
             file_ranker,
             build_queue: build_sender,
         }
@@ -134,12 +125,7 @@ impl FileSearchCache {
     ) -> Result<Vec<SearchResult>, CacheError> {
         let repo_path_buf = repo_path.to_path_buf();
 
-        // Check if we have a valid cache entry
-        if let Some(cached) = self.cache.get(&repo_path_buf).await
-            && let Ok(head_info) = self.git_service.get_head_info(&repo_path_buf)
-            && head_info.oid == cached.head_sha
-        {
-            // Cache hit - perform fast search with mode-based filtering
+        if let Some(cached) = self.cache.get(&repo_path_buf).await {
             return Ok(self.search_in_cache(&cached, query, mode).await);
         }
 
@@ -187,15 +173,6 @@ impl FileSearchCache {
             }
         }
 
-        // Apply git history-based ranking
-        self.file_ranker.rerank(&mut results, &cached.stats);
-
-        // Populate scores for sorted results
-        for result in &mut results {
-            result.score = self.file_ranker.calculate_score(result, &cached.stats);
-        }
-
-        // Limit to top 10 results
         results.truncate(10);
         results
     }
@@ -318,30 +295,17 @@ impl FileSearchCache {
             }
         }
 
-        // Apply git history-based ranking
-        match self.file_ranker.get_stats(repo_path).await {
-            Ok(stats) => {
-                self.file_ranker.rerank(&mut results, &stats);
-                // Populate scores for sorted results
-                for result in &mut results {
-                    result.score = self.file_ranker.calculate_score(result, &stats);
-                }
-            }
-            Err(_) => {
-                // Fallback to basic priority sorting
-                results.sort_by(|a, b| {
-                    let priority = |match_type: &SearchMatchType| match match_type {
-                        SearchMatchType::FileName => 0,
-                        SearchMatchType::DirectoryName => 1,
-                        SearchMatchType::FullPath => 2,
-                    };
+        results.sort_by(|a, b| {
+            let priority = |match_type: &SearchMatchType| match match_type {
+                SearchMatchType::FileName => 0,
+                SearchMatchType::DirectoryName => 1,
+                SearchMatchType::FullPath => 2,
+            };
 
-                    priority(&a.match_type)
-                        .cmp(&priority(&b.match_type))
-                        .then_with(|| a.path.cmp(&b.path))
-                });
-            }
-        }
+            priority(&a.match_type)
+                .cmp(&priority(&b.match_type))
+                .then_with(|| a.path.cmp(&b.path))
+        });
 
         results.truncate(10);
         Ok(results)
@@ -353,28 +317,13 @@ impl FileSearchCache {
 
         info!("Building cache for repo: {:?}", repo_path);
 
-        // Get current HEAD
-        let head_info = self
-            .git_service
-            .get_head_info(&repo_path_buf)
-            .map_err(|e| format!("Failed to get HEAD info: {e}"))?;
-
-        // Get git stats
-        let stats = self
-            .file_ranker
-            .get_stats(repo_path)
-            .await
-            .map_err(|e| format!("Failed to get git stats: {e}"))?;
-
-        // Build file index
         let file_index = Self::build_file_index(repo_path)
             .map_err(|e| format!("Failed to build file index: {e}"))?;
 
         Ok(CachedRepo {
-            head_sha: head_info.oid,
+            head_sha: String::new(),
             fst_index: file_index.map,
             indexed_files: file_index.files,
-            stats,
             build_ts: Instant::now(),
         })
     }
@@ -506,7 +455,6 @@ impl FileSearchCache {
     async fn background_worker(
         mut build_receiver: mpsc::UnboundedReceiver<PathBuf>,
         cache: Cache<PathBuf, CachedRepo>,
-        git_service: GitService,
         file_ranker: FileRanker,
     ) {
         while let Some(repo_path) = build_receiver.recv().await {
@@ -520,9 +468,8 @@ impl FileSearchCache {
 
             let cache_builder = FileSearchCache {
                 cache: cache.clone(),
-                git_service: git_service.clone(),
                 file_ranker: file_ranker.clone(),
-                build_queue: mpsc::unbounded_channel().0, // Dummy sender
+                build_queue: mpsc::unbounded_channel().0,
             };
 
             match cache_builder.build_repo_cache(&repo_path).await {

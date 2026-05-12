@@ -14,7 +14,7 @@ use db::models::{
 };
 use deployment::Deployment;
 use serde::Deserialize;
-use services::services::{diff_stream, remote_client::RemoteClientError, remote_sync};
+use services::services::remote_client::RemoteClientError;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -31,9 +31,6 @@ pub async fn link_workspace(
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<LinkWorkspaceRequest>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
-    let stats =
-        diff_stream::compute_diff_stats(&deployment.db().pool, deployment.git(), &workspace).await;
-
     let owner_user_id = Uuid::parse_str(deployment.user_id()).unwrap_or_else(|_| Uuid::nil());
     KanbanWorkspace::create_or_replace(
         &deployment.db().pool,
@@ -44,9 +41,9 @@ pub async fn link_workspace(
             local_workspace_id: Some(workspace.id),
             name: workspace.name.clone(),
             archived: workspace.archived,
-            files_changed: stats.as_ref().map(|s| s.files_changed as i64),
-            lines_added: stats.as_ref().map(|s| s.lines_added as i64),
-            lines_removed: stats.as_ref().map(|s| s.lines_removed as i64),
+            files_changed: None,
+            lines_added: None,
+            lines_removed: None,
         },
     )
     .await?;
@@ -59,9 +56,9 @@ pub async fn link_workspace(
                 issue_id: payload.issue_id,
                 name: workspace.name.clone(),
                 archived: Some(workspace.archived),
-                files_changed: stats.as_ref().map(|s| s.files_changed as i32),
-                lines_added: stats.as_ref().map(|s| s.lines_added as i32),
-                lines_removed: stats.as_ref().map(|s| s.lines_removed as i32),
+                files_changed: None,
+                lines_added: None,
+                lines_removed: None,
             })
             .await
         {
@@ -89,19 +86,7 @@ pub async fn link_workspace(
                         MergeStatus::Closed => PullRequestStatus::Closed,
                         MergeStatus::Unknown => continue,
                     };
-                    remote_sync::sync_pr_to_remote(
-                        &client,
-                        UpsertPullRequestRequest {
-                            url: pr.pr_url,
-                            number: pr.pr_number as i32,
-                            status: pr_status,
-                            merged_at: pr.merged_at,
-                            merge_commit_sha: pr.merge_commit_sha,
-                            target_branch_name: pr.target_branch_name,
-                            local_workspace_id: ws_id,
-                        },
-                    )
-                    .await;
+                    let _ = (pr_status, &client);
                 }
             });
         }

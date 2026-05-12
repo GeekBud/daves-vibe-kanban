@@ -9,7 +9,6 @@ import { useStyleOverrideThemeSetter } from '@/shared/lib/StyleOverride';
 import { WebviewContextMenu } from '@/integrations/vscode/ContextMenu';
 import { ArrowDownIcon } from '@phosphor-icons/react';
 import { useWorkspaceContext } from '@/shared/hooks/useWorkspaceContext';
-import { useDiffStats } from '@/shared/stores/useWorkspaceDiffStore';
 import { usePageTitle } from '@/shared/hooks/usePageTitle';
 import { SessionChatBoxContainer } from '@/features/workspace-chat/ui/SessionChatBoxContainer';
 import {
@@ -46,7 +45,6 @@ function VSCodeChatBox({
   onScrollToUserMessage: (patchKey: string) => void;
   getActiveTurnPatchKey: () => string | null;
 }) {
-  const diffStats = useDiffStats();
 
   return (
     <SessionChatBoxContainer
@@ -67,9 +65,9 @@ function VSCodeChatBox({
               mode: 'placeholder' as const,
             })}
       sessions={sessions}
-      filesChanged={diffStats.files_changed}
-      linesAdded={diffStats.lines_added}
-      linesRemoved={diffStats.lines_removed}
+      filesChanged={0}
+      linesAdded={0}
+      linesRemoved={0}
       disableViewCode
       showOpenWorkspaceButton={false}
       onScrollToPreviousMessage={onScrollToPreviousMessage}

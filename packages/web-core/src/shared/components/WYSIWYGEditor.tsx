@@ -66,7 +66,6 @@ import { TableNode, TableRowNode, TableCellNode } from '@lexical/table';
 import { TablePlugin } from '@lexical/react/LexicalTablePlugin';
 import { type EditorState, type LexicalEditor } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { useDiffPaths } from '@/shared/stores/useWorkspaceDiffStore';
 import { useSlashCommands } from '@/shared/hooks/useExecutorDiscovery';
 import { useUiPreferencesStore } from '@/shared/stores/useUiPreferencesStore';
 import { cn } from '@/shared/lib/utils';
@@ -74,17 +73,8 @@ import { repoApi } from '@/shared/lib/api';
 import { searchTagsAndFiles } from '@/shared/lib/searchTagsAndFiles';
 import { Button } from '@vibe/ui/components/Button';
 import { Check, Clipboard, Pencil, Trash2 } from 'lucide-react';
-import type { RepoItem } from '@/shared/types/selectionItems';
 import { TagEditDialog } from '@/shared/dialogs/shared/TagEditDialog';
 import { ImagePreviewDialog } from '@/shared/dialogs/wysiwyg/ImagePreviewDialog';
-import {
-  SelectionDialog,
-  type SelectionPage,
-} from '@/shared/dialogs/command-bar/SelectionDialog';
-import {
-  buildRepoSelectionPages,
-  type RepoSelectionResult,
-} from '@/shared/dialogs/command-bar/selections/repoSelection';
 import { fetchAttachmentSasUrl } from '@/shared/lib/remoteApi';
 import { writeClipboardViaBridge } from '@/shared/lib/clipboard';
 import type { SendMessageShortcut } from 'shared/types';
@@ -223,16 +213,6 @@ function dedupeClipboardFiles(files: File[]): File[] {
   return uniqueByMetadata.slice(0, MAX_CLIPBOARD_PASTED_FILES);
 }
 
-function getRepoDisplayName(repo: RepoLike): string {
-  return repo.display_name || repo.name;
-}
-
-function toRepoItem(repo: RepoLike): RepoItem {
-  return {
-    id: repo.id,
-    display_name: getRepoDisplayName(repo),
-  };
-}
 
 /** Plugin to capture the Lexical editor instance into a ref */
 function EditorRefPlugin({
@@ -297,7 +277,6 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
 
     // Copy button state
     const [copied, setCopied] = useState(false);
-    const diffPaths = useDiffPaths();
     const preferredRepoId = useUiPreferencesStore(
       (state) => state.fileSearchRepoId
     );
@@ -317,14 +296,9 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
         return null;
       }
     }, []);
-    const chooseRepo = useCallback(async (repos: RepoLike[]) => {
-      const repoResult = (await SelectionDialog.show({
-        initialPageId: 'selectRepo',
-        pages: buildRepoSelectionPages(repos.map(toRepoItem)) as Record<
-          string,
-          SelectionPage
-        >,
-      })) as RepoSelectionResult | undefined;
+    const chooseRepo = useCallback(async (_repos: RepoLike[]) => {
+      const repoResult = null as any;
+
       return repoResult;
     }, []);
     const handleCreateTag = useCallback(async () => {
@@ -565,7 +539,7 @@ const WYSIWYGEditor = forwardRef<WYSIWYGEditorRef, WysiwygProps>(
                     <TypeaheadOpenProvider>
                       <FileTagTypeaheadPlugin
                         repoIds={repoIds}
-                        diffPaths={diffPaths}
+                        diffPaths={new Set<string>()}
                         preferredRepoId={preferredRepoId}
                         setPreferredRepoId={setFileSearchRepo}
                         listRecentRepos={listRecentRepos}

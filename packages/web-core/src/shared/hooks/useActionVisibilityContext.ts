@@ -6,11 +6,9 @@ import {
   type LayoutMode,
 } from '@/shared/stores/useUiPreferencesStore';
 import { useDiffViewMode } from '@/shared/stores/useDiffViewStore';
-import { useDiffPaths } from '@/shared/stores/useWorkspaceDiffStore';
 import { useWorkspaceContext } from '@/shared/hooks/useWorkspaceContext';
 import { useUserSystem } from '@/shared/hooks/useUserSystem';
 import { useDevServer } from '@/shared/hooks/useDevServer';
-import { useBranchStatus } from '@/shared/hooks/useBranchStatus';
 import { useShape } from '@/shared/integrations/electric/hooks';
 import { useExecutionProcessesContext } from '@/shared/hooks/useExecutionProcessesContext';
 import { useLogsPanel } from '@/shared/hooks/useLogsPanel';
@@ -19,7 +17,6 @@ import { isProjectDestination } from '@/shared/lib/routes/appNavigation';
 import { useCurrentAppDestination } from '@/shared/hooks/useCurrentAppDestination';
 import { useCurrentKanbanRouteState } from '@/shared/hooks/useCurrentKanbanRouteState';
 import { PROJECT_ISSUES_SHAPE } from 'shared/remote-types';
-import type { Merge } from 'shared/types';
 import type {
   ActionVisibilityContext,
   DevServerState,
@@ -43,7 +40,7 @@ export function useActionVisibilityContext(
   const panelState = useWorkspacePanelState(
     isCreateMode ? undefined : workspaceId
   );
-  const diffPathsSet = useDiffPaths();
+  const diffPaths = new Set<string>();
   const diffViewMode = useDiffViewMode();
   const expanded = useUiPreferencesStore((s) => s.expanded);
 
@@ -89,15 +86,13 @@ export function useActionVisibilityContext(
   const { config } = useUserSystem();
   const { isStarting, isStopping, runningDevServers } =
     useDevServer(workspaceId);
-  const { data: branchStatus } = useBranchStatus(workspaceId);
   const { isAttemptRunningVisible } = useExecutionProcessesContext();
   const { logsPanelContent } = useLogsPanel();
   const { isSignedIn } = useAuth();
 
   return useMemo(() => {
-    // Compute isAllDiffsExpanded
-    const diffPaths = Array.from(diffPathsSet);
-    const diffKeys = diffPaths.map((p: string) => `diff:${p}`);
+    const diffPathsArr = Array.from(diffPaths);
+    const diffKeys = diffPathsArr.map((p: string) => `diff:${p}`);
     const isAllDiffsExpanded =
       diffKeys.length > 0 &&
       diffKeys.every((k: string) => expanded[k] !== false);
@@ -111,17 +106,9 @@ export function useActionVisibilityContext(
           ? 'running'
           : 'stopped';
 
-    // Compute git state from branch status
-    const hasOpenPR =
-      branchStatus?.some((repo) =>
-        repo.merges?.some(
-          (m: Merge) => m.type === 'pr' && m.pr_info.status === 'open'
-        )
-      ) ?? false;
+    const hasOpenPR = false;
 
-    const hasUnpushedCommits =
-      branchStatus?.some((repo) => (repo.remote_commits_ahead ?? 0) > 0) ??
-      false;
+    const hasUnpushedCommits = false;
 
     return {
       layoutMode,
@@ -132,7 +119,7 @@ export function useActionVisibilityContext(
       isCreateMode,
       hasWorkspace: !!workspace,
       workspaceArchived: workspace?.archived ?? false,
-      hasDiffs: diffPathsSet.size > 0,
+      hasDiffs: diffPathsArr.length > 0,
       diffViewMode,
       isAllDiffsExpanded,
       editorType: config?.editor?.editor_type ?? null,
@@ -158,14 +145,14 @@ export function useActionVisibilityContext(
     isCreateMode,
     workspace,
     repos,
-    diffPathsSet,
+    diffPaths,
     diffViewMode,
     expanded,
     config?.editor?.editor_type,
     isStarting,
     isStopping,
     runningDevServers,
-    branchStatus,
+
     isAttemptRunningVisible,
     logsPanelContent,
     hasSelectedKanbanIssue,

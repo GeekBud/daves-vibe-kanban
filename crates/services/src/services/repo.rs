@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use db::models::repo::{Repo as RepoModel, SearchMatchType, SearchResult};
-use git::{GitService, GitServiceError};
 use sqlx::SqlitePool;
 use thiserror::Error;
 use utils::path::expand_tilde;
@@ -19,14 +18,10 @@ pub enum RepoError {
     PathNotFound(PathBuf),
     #[error("Path is not a directory: {0}")]
     PathNotDirectory(PathBuf),
-    #[error("Path is not a git repository: {0}")]
-    NotGitRepository(PathBuf),
     #[error("Repository not found")]
     NotFound,
     #[error("Directory already exists: {0}")]
     DirectoryAlreadyExists(PathBuf),
-    #[error("Git error: {0}")]
-    Git(#[from] GitServiceError),
     #[error("Invalid folder name: {0}")]
     InvalidFolderName(String),
 }
@@ -41,19 +36,13 @@ impl RepoService {
         Self
     }
 
-    fn validate_git_repo_path(&self, path: &Path) -> Result<()> {
+    fn validate_path(&self, path: &Path) -> Result<()> {
         if !path.exists() {
             return Err(RepoError::PathNotFound(path.to_path_buf()));
         }
-
         if !path.is_dir() {
             return Err(RepoError::PathNotDirectory(path.to_path_buf()));
         }
-
-        if !path.join(".git").exists() {
-            return Err(RepoError::NotGitRepository(path.to_path_buf()));
-        }
-
         Ok(())
     }
 
@@ -68,7 +57,7 @@ impl RepoService {
         display_name: Option<&str>,
     ) -> Result<RepoModel> {
         let normalized_path = self.normalize_path(path)?;
-        self.validate_git_repo_path(&normalized_path)?;
+        self.validate_path(&normalized_path)?;
 
         let name = normalized_path
             .file_name()
@@ -76,7 +65,6 @@ impl RepoService {
             .unwrap_or_else(|| "unnamed".to_string());
 
         let display_name = display_name.unwrap_or(&name);
-
         let repo = RepoModel::find_or_create(pool, &normalized_path, display_name).await?;
         Ok(repo)
     }
@@ -92,10 +80,9 @@ impl RepoService {
             .ok_or(RepoError::NotFound)
     }
 
-    pub async fn init_repo(
+    pub async fn init_project(
         &self,
         pool: &SqlitePool,
-        git: &GitService,
         parent_path: &str,
         folder_name: &str,
     ) -> Result<RepoModel> {
@@ -116,14 +103,14 @@ impl RepoService {
             return Err(RepoError::PathNotDirectory(normalized_parent));
         }
 
-        let repo_path = normalized_parent.join(folder_name);
-        if repo_path.exists() {
-            return Err(RepoError::DirectoryAlreadyExists(repo_path));
+        let project_path = normalized_parent.join(folder_name);
+        if project_path.exists() {
+            return Err(RepoError::DirectoryAlreadyExists(project_path));
         }
 
-        git.initialize_repo_with_main_branch(&repo_path)?;
+        std::fs::create_dir_all(&project_path)?;
 
-        let repo = RepoModel::find_or_create(pool, &repo_path, folder_name).await?;
+        let repo = RepoModel::find_or_create(pool, &project_path, folder_name).await?;
         Ok(repo)
     }
 
@@ -138,7 +125,6 @@ impl RepoService {
             return Ok(vec![]);
         }
 
-        // Search in parallel and prefix paths with repo name
         let search_futures: Vec<_> = repositories
             .iter()
             .map(|repo| {
@@ -181,7 +167,7 @@ impl RepoService {
             };
             priority(&a.match_type)
                 .cmp(&priority(&b.match_type))
-                .then_with(|| b.score.cmp(&a.score)) // Higher scores first
+                .then_with(|| b.score.cmp(&a.score))
         });
 
         all_results.truncate(10);

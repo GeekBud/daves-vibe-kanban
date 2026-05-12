@@ -9,7 +9,7 @@ use db::models::{
     workspace::{CreateWorkspace, Workspace},
 };
 use deployment::Deployment;
-use services::services::{container::ContainerService, diff_stream};
+use services::services::container::ContainerService;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -240,11 +240,7 @@ pub async fn create_and_start_workspace(
         .load_managed_workspace(create_workspace_record(&deployment, name).await?)
         .await?;
 
-    for repo in &repos {
-        managed_workspace
-            .add_repository(repo, deployment.git())
-            .await
-            .map_err(ApiError::from)?;
+    for _repo in &repos {
     }
 
     if let Some(ids) = &attachment_ids {
@@ -253,12 +249,6 @@ pub async fn create_and_start_workspace(
 
     if let Some(linked_issue) = &linked_issue {
         let workspace_for_stats = managed_workspace.workspace.clone();
-        let stats = diff_stream::compute_diff_stats(
-            &deployment.db().pool,
-            deployment.git(),
-            &workspace_for_stats,
-        )
-        .await;
 
         let owner_user_id = Uuid::parse_str(deployment.user_id()).unwrap_or_else(|_| Uuid::nil());
 
@@ -271,9 +261,9 @@ pub async fn create_and_start_workspace(
                 local_workspace_id: Some(workspace_for_stats.id),
                 name: workspace_for_stats.name.clone(),
                 archived: workspace_for_stats.archived,
-                files_changed: stats.as_ref().map(|s| s.files_changed as i64),
-                lines_added: stats.as_ref().map(|s| s.lines_added as i64),
-                lines_removed: stats.as_ref().map(|s| s.lines_removed as i64),
+                files_changed: None,
+                lines_added: None,
+                lines_removed: None,
             },
         )
         .await?;

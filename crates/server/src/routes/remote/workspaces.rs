@@ -20,8 +20,13 @@ pub(super) fn router() -> Router<DeploymentImpl> {
 async fn get_workspace_by_local_id(
     State(deployment): State<DeploymentImpl>,
     Path(local_workspace_id): Path<Uuid>,
-) -> Result<ResponseJson<ApiResponse<Workspace>>, ApiError> {
-    let client = deployment.remote_client()?;
-    let workspace = client.get_workspace_by_local_id(local_workspace_id).await?;
-    Ok(ResponseJson(ApiResponse::success(workspace)))
+) -> Result<ResponseJson<ApiResponse<Option<Workspace>>>, ApiError> {
+    let client = match deployment.remote_client() {
+        Ok(c) => c,
+        Err(_) => return Ok(ResponseJson(ApiResponse::success(None))),
+    };
+    match client.get_workspace_by_local_id(local_workspace_id).await {
+        Ok(workspace) => Ok(ResponseJson(ApiResponse::success(Some(workspace)))),
+        Err(_) => Ok(ResponseJson(ApiResponse::success(None))),
+    }
 }
