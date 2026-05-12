@@ -1,0 +1,1346 @@
+crates/executors/src/executors/kimi.rs
+  c62ac920716735ec 126-128,360-383,393,396,399-403,406-410,414-418,422-426,431-435,438-442,490-501,573-585,694-696,744-749,776-778,833-834,840-843,853-855,892-894,927-950,956-958,1049,1066,1107-1108,1118-1119,1141,1167,1179-1185,1194-1196,1209-1228,1238-1240,1254,1264-1270,1277-1279,1289-1301,1323-1327,1336-1342,1351-1359,1364-1368
+  edcf69345492ee05 20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.7",
+  "base_commit_sha": "2fdc01b86606c48215bca60857fe1f6e0b859487",
+  "prompts": {
+    "0570c6fb83ec4104": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-e5a2148b-27bb-4204-8267-4892a2ad414b",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/features/workspace-chat/model/hooks/useResetProcess.ts": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "05bd92e45837c330": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-23f292dd-dd06-42ef-8ca2-8afea9e438c4",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/container.rs": {
+          "accepted_lines": 4
+        }
+      }
+    },
+    "07e3bb2a55608945": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-b93ac07c-7973-4c21-9ba2-d0725899e7e5",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/pages/workspaces/VSCodeWorkspacePage.tsx": {
+          "accepted_lines": 3
+        }
+      }
+    },
+    "1016eee78a51da4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-eb437b18-423b-44fe-b0c0-e4c39d015002",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/container.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "130bdf71aab0696c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-06de6631-df59-4889-9d7d-2b2cdff59f22",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/hooks/useActionVisibilityContext.ts": {
+          "accepted_lines": 3
+        }
+      }
+    },
+    "181a773d213637b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-fcf882a8-9b47-45dd-b251-4b5be1907f40",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/pages/workspaces/FileTreeContainer.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "18c6474a688004a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_242343368ffeuYJz890My4IVph-3c7253de-d57a-41e1-aa42-d1196948a063",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 7,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/executors/src/executors/cursor.rs": {
+          "accepted_lines": 7
+        }
+      }
+    },
+    "2296ec14a9e6c56a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-cb07fdf8-58f8-45a6-b4c5-52d1386a29b6",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/features/workspace-chat/ui/SessionChatBoxContainer.tsx": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "24ce94584adfc967": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-416797fc-9c3d-455c-b875-9e0053feb999",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/hooks/useActionVisibilityContext.ts": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "2f8f6cd297d5d50e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1f7f3db07ffe7dqOSBptr1Pkrz",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 23,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/pages/workspaces/FileTreeContainer.tsx": {
+          "accepted_lines": 6
+        },
+        "packages/web-core/src/shared/components/CreateModeRepoPickerBar.tsx": {
+          "accepted_lines": 3
+        },
+        "packages/web-core/src/features/workspace-chat/model/hooks/useResetProcess.ts": {
+          "accepted_lines": 1
+        },
+        "packages/web-core/src/shared/hooks/useActionVisibilityContext.ts": {
+          "accepted_lines": 2
+        },
+        "crates/server/src/routes/workspaces/core.rs": {
+          "accepted_lines": 1
+        },
+        "packages/web-core/src/shared/components/WYSIWYGEditor.tsx": {
+          "accepted_lines": 2
+        },
+        "crates/server/src/routes/workspaces/create.rs": {
+          "accepted_lines": 1
+        },
+        "crates/server/src/routes/workspaces/links.rs": {
+          "accepted_lines": 7
+        }
+      }
+    },
+    "3234d66cd32e03cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-5e7610d5-c02d-43f6-bf8a-88e08df24e86",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/executors/src/env.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "32970b57e923cef6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-e0dbc85e-7bbf-4631-9456-c30a428b7a01",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/dialogs/settings/settings/ReposSettingsSection.tsx": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "35da7d772e35538f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-f89ab6af-d317-4ac4-b7d2-3ca3dc29d605",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/oauth.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "3a659cbb3a172afa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-d71c6ec1-dd27-4b42-99c6-892d45f41fc4",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/providers/WorkspaceProvider.tsx": {
+          "accepted_lines": 6
+        }
+      }
+    },
+    "3f86cb297ed07778": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-dc2e0758-04df-49a8-9686-5e0e83490589",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/file_search.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "41be2fd66d5e2095": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-b62e7e0b-2f81-4653-bd87-a9377d0be300",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/file_search.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "427644de580e9373": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-5a3da5b1-6bba-43fb-b617-322b9499c17e",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/pages/workspaces/WorkspacesLayout.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "43b7339a93577ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-8721f4cc-70a2-4850-b10e-c980e46edae2",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/container.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "4995cb77e5c229c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-a1486787-041b-440d-8a0a-a02441b1115f",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/workspaces/core.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "4d91990ab8d6a89b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-4b361d92-3397-4ef8-9de3-02200264fade",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/file_ranker.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "4ef43f6cd29964bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-3bb51dbb-2d6e-4b19-9a85-e1efcdffa162",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/dialogs/settings/settings/RemoteProjectsSettingsSection.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "514a2ecd92ffc377": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-714e52c2-d86e-41ac-9415-83acfd284d52",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/workspaces/workspace_summary.rs": {
+          "accepted_lines": 4
+        }
+      }
+    },
+    "668a757d3f764e8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-1cd88313-e2ee-4c1c-9dae-2de04e4cac01",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/workspaces/core.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "69ac9cbfc57a3313": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-78e50c39-6334-44b2-a900-2d0fe120a7f3",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/container.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "69cbc6a1c6a5aee9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-04b5f017-3daa-4883-a202-a1541acfa60a",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/features/workspace-chat/ui/SessionChatBoxContainer.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "6d29947da1daf3e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-9e4fed7a-8dae-4c26-a827-b73744184ef9",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/file_search.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "76272301c5ee0720": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-26486700-5052-4fdf-af86-d9febfe2d9d0",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/workspace-manager/src/workspace_manager.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "80b2c43a3274a11a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-22f847a0-7cfb-446e-8dc3-b1604321e658",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 10,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/file_search.rs": {
+          "accepted_lines": 10
+        }
+      }
+    },
+    "84f160b7873a5278": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-f8bd747e-b7d4-458d-9e3b-b165489f3558",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/hooks/useActionVisibilityContext.ts": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "8efa92dfffeac470": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-22d70210-a990-4045-a35a-b5134128ec72",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/error.rs": {
+          "accepted_lines": 6
+        }
+      }
+    },
+    "9738e244ac4e7c06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-69a374cb-5e1b-4aaa-996a-683422ee8c4a",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/container.rs": {
+          "accepted_lines": 5
+        }
+      }
+    },
+    "9913135471921dac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-c67a8b4c-ad59-4e97-823f-becfe94e9da0",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/container.rs": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "993b79c39d1e9813": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-fa9ec053-ac66-48a3-9e97-90c73a2b7193",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/sessions/review.rs": {
+          "accepted_lines": 5
+        }
+      }
+    },
+    "9e39a6b3098ad1ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-cad532ce-ba76-47c7-af45-8a4b958f6705",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/executors/src/executors/kimi.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "a020fe2412053813": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-5cb61e2f-0a15-4d86-bc07-d91c663aca9a",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/config.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "a8a4b24034922616": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-c675d4c7-de27-40f4-b40d-28b26941b031",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/workspace-manager/src/workspace_manager.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "a934f485e19ad5c6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-91ba88ae-ea3b-43e1-9ac2-c636d251dd5d",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/components/CreateModeRepoPickerBar.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "acf468fdc4d9778a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-77f65c31-5597-4b88-82fc-8eb3ca30f475",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/container.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "b3ada38519a14835": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-3b93be94-e31c-44b4-aba0-7e0d77ec71ed",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/container.rs": {
+          "accepted_lines": 3
+        }
+      }
+    },
+    "b423afb6b0411e64": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-6822db99-d0c9-4379-a282-7bd9119b79e2",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/pages/workspaces/RightSidebar.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "b67018400f0ab519": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-7e993957-9699-40a7-8621-40ab0b03ba26",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/container.rs": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "bb1427a492ff331e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-a8c184b1-25d3-4094-8c63-e3e05997423a",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/features/workspace-chat/model/hooks/useResetProcess.ts": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "c1d028928475198a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-5a1d12ef-6c68-4cd6-834c-d21f643a1eef",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/container.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "c247a86fa557e118": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-d7f9a0e2-eda6-4b24-9eb5-88c135f94d7a",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 20,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/file_ranker.rs": {
+          "accepted_lines": 20
+        }
+      }
+    },
+    "c4232e9708dfcc7d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-fbfd598e-4caa-4625-a946-3ee75e0222f6",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/dialogs/command-bar/CommandBarDialog.tsx": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "c57b4a807ce32087": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-ce113797-f846-439e-9f2f-fb2adaea6d77",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 149,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/repo.rs": {
+          "accepted_lines": 149
+        }
+      }
+    },
+    "c62ac920716735ec": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_241c8b220ffe3vnpZSqAwbC5ra",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 226,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/executors/src/executors/kimi.rs": {
+          "accepted_lines": 226
+        }
+      }
+    },
+    "c876161c44d20a01": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-79fee7bc-9207-4452-bd9b-0cf31e5466dc",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/workspaces/create.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "c9636a88524f69b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-3dd05fdc-20d9-42a0-8c1a-a8a64d124371",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 8,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/providers/WorkspaceProvider.tsx": {
+          "accepted_lines": 8
+        }
+      }
+    },
+    "c973cef3db10b69d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-1fd62ff7-4008-44c6-b59b-9009d5fe92dc",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 9,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/remote/workspaces.rs": {
+          "accepted_lines": 9
+        }
+      }
+    },
+    "ca0410355d5a38d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-dd60fe61-ba9b-4909-9c09-5f72422639bd",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/lib.rs": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "cc02460406bb1368": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-c5b692d4-995f-4e87-9c50-925113f7636f",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/container.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "ce67d28f2c8d7a77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-dd9cd493-9740-4b0f-84fd-3d0aa13a48bc",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/workspaces/create.rs": {
+          "accepted_lines": 3
+        }
+      }
+    },
+    "cebd25a7bfe78b50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-6e65ed14-a462-4418-8794-7b6eec48c759",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/file_search.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "d10c0d2b62edec67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-eaad6e4e-fa37-4835-84fc-b100398cfd5e",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/components/CreateModeRepoPickerBar.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "dc8d9e98f4fb197d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-4596c07a-6589-4b9d-8dfe-ee4895423ed1",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 61,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/workspace-manager/src/workspace_manager.rs": {
+          "accepted_lines": 61
+        }
+      }
+    },
+    "dd10d62c9b1ca135": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-ca588beb-6ffe-4ede-aab1-a09ef4a9fa9f",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/workspaces/links.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "de0b8cc697261618": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-262e08ec-065c-4442-b970-58ac014367b0",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/features/workspace-chat/ui/SessionChatBoxContainer.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "de80d501cf04f27c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-60e22d6b-70ab-4bb2-9dbf-011143991fc6",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/local-deployment/src/lib.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "e3fb137e42a733b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-bfc40a46-762a-446e-b052-c351d2b59e20",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/workspace-manager/src/workspace_manager.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "e63a225330bd6f9f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-5384455d-7f38-4481-89db-7f30dfe41844",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/features/workspace-chat/model/hooks/useResetProcess.ts": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "e65e20bbaf6114ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-302c325b-9d4e-4dbb-b4cf-6fda610a6847",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/components/WYSIWYGEditor.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "eb14136751b945ad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-db699bae-d1d3-4882-a557-69c90ff54f03",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/pages/workspaces/VSCodeWorkspacePage.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "eb6639c73c399ca7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-450a5342-bc9a-46c1-9171-6ec84561a004",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/workspaces/repos.rs": {
+          "accepted_lines": 6
+        }
+      }
+    },
+    "ec9cee8b183086ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-a0883d2d-0d67-417f-bec4-15b84b5fb152",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/container.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "edcf69345492ee05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-43b88863-376d-4140-8848-5856e3306f44",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/executors/src/executors/kimi.rs": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "f0b0a0dfa183785b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_24236b192ffe5Iu06dwJa47C5v-10533a69-a07b-4db9-bdf5-57893aa160fb",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/container.rs": {
+          "accepted_lines": 3
+        }
+      }
+    },
+    "f0b4508b7d49b62b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-59b53c93-8d78-48e8-9302-3cf9f5c4dd28",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/server/src/routes/oauth.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "f65c14acb69245e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-b1988764-1e17-4f4a-b24b-6cb5d3af3c3e",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/container.rs": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "f8e4cb06a031c373": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-9d197d8f-6f75-4a28-a765-54be7d688440",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/workspace-manager/src/lib.rs": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "fbb3d1c961a8dad0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-5d263410-9ac8-4be8-b3a8-fa2549807e29",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "packages/web-core/src/shared/components/WYSIWYGEditor.tsx": {
+          "accepted_lines": 1
+        }
+      }
+    },
+    "fc78509f8e2647bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-271942f6-e5dd-4360-b53b-a12c88a96c70",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/services/src/services/container.rs": {
+          "accepted_lines": 2
+        }
+      }
+    },
+    "ff611e3a194a63d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_1f7f3db07ffe7dqOSBptr1Pkrz-b376df18-c51e-4675-a7f5-0bbc197a8a3a",
+        "model": "unknown"
+      },
+      "human_author": "uid=lianghusile,ou=people,dc=hz,dc=netease,dc=com",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "crates/workspace-manager/Cargo.toml": {
+          "accepted_lines": 1
+        }
+      }
+    }
+  }
+}
