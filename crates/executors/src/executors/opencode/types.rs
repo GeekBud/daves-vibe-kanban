@@ -67,7 +67,6 @@ pub(super) enum SdkEvent {
     PermissionAsked(PermissionAskedEvent),
     PermissionReplied,
     SessionIdle,
-    SessionUpdated,
     SessionStatus(SessionStatusEvent),
     SessionDiff,
     SessionCompacted,
@@ -102,10 +101,6 @@ impl SdkEvent {
             }
             "permission.replied" => SdkEvent::PermissionReplied,
             "session.idle" => SdkEvent::SessionIdle,
-            "session.updated" => {
-                parse_session_updated_event(&envelope.properties)?;
-                SdkEvent::SessionUpdated
-            }
             "session.status" => {
                 SdkEvent::SessionStatus(serde_json::from_value(envelope.properties).ok()?)
             }
@@ -302,11 +297,6 @@ pub(super) enum SessionStatus {
 #[derive(Debug, Deserialize)]
 pub(super) struct TodoUpdatedEvent {
     pub(super) todos: Vec<SdkTodo>,
-}
-
-fn parse_session_updated_event(properties: &Value) -> Option<()> {
-    properties.get("sessionID")?.as_str()?;
-    Some(())
 }
 
 #[derive(Debug, Deserialize)]

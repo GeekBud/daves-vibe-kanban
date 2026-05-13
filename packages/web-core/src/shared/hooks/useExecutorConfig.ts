@@ -122,6 +122,7 @@ function useEffectiveOverrides(
   userSelections: Partial<ExecutorConfig>,
   scratchConfig: ExecutorConfig | null | undefined,
   lastUsedConfig: ExecutorConfig | null,
+  variantWasUserSelected: boolean,
   presetOptions: ExecutorConfig | null | undefined
 ) {
   return useMemo((): ExecutorConfig | null => {
@@ -160,7 +161,7 @@ function useEffectiveOverrides(
             (lastUsedMatches && lastUsedModelMatches
               ? lastUsedConfig?.[field]
               : undefined) ??
-            presetOptions?.[field]);
+            (variantWasUserSelected ? presetOptions?.[field] : undefined));
       if (value !== undefined) {
         (resolved as Record<string, unknown>)[field] = value;
       }
@@ -174,6 +175,7 @@ function useEffectiveOverrides(
     scratchConfig,
     lastUsedConfig,
     presetOptions,
+    variantWasUserSelected,
   ]);
 }
 
@@ -237,6 +239,7 @@ export function useExecutorConfig({
     userSelections,
     scratchConfig,
     lastUsedConfig,
+    variant.wasUserSelected,
     presetOptions
   );
 
